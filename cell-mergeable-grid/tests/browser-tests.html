@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8">
+    <title>CellMergeableGrid Browser Tests</title>
+</head>
+<body>
+    <h1>CellMergeableGrid Browser Tests</h1>
+    <table id="grid" class="existing-mps-table">
+        <colgroup><col><col><col><col><col></colgroup>
+    </table>
+    <pre id="results" data-status="running">RUNNING</pre>
+    <script src="../CellMergeableGrid.js"></script>
+    <script>
+    (function () {
+        "use strict";
+        var logs = [];
+        var passed = 0;
+        var failed = 0;
+        var table = document.getElementById("grid");
+        var initial = [
+            {key1:"A", key2:"01", qty:10, status:"<img src=x>", hidden:100},
+            {key1:"A", key2:"02", qty:20, status:"완료", hidden:101},
+            {key1:"B", key2:"01", qty:30, status:"대기", hidden:102},
+            {key1:"B", key2:"02", qty:40, status:"완료", hidden:103}
+        ];
+        function check(condition, msg) {
+            if (!condition) { throw new Error(msg || "assertion failed"); }
+        }
+        function same(actual, expected, msg) {
+            check(JSON.stringify(actual) === JSON.stringify(expected),
+                (msg || "not equal") + " actual=" + JSON.stringify(actual) +
+                " expected=" + JSON.stringify(expected));
+        }
+        function test(name, fn) {
+            try {
+                fn();
+                passed++;
+                logs.push("PASS " + name);
+            } catch (error) {
+                failed++;
+                logs.push("FAIL " + name + " — " + error.message);
+            }
+        }
+        function signalChange(element) {
+            element.dispatchEvent(new Event("change", {bubbles:true}));
+        }
+
+        var selectionEvents = [];
+        var changes = [];
+        var grid = new CellMergeableGrid(table, {
+            keyFields: ["key1", "key2"],
+            columns: [
+                {type:"radio",title:"선택"},
+                {field:"key1",title:"그룹",merge:true},
+                {field:"key2",title:"항목"},
+                {field:"qty",title:"수량",editor:"number",onChange:function (value,row) {
+                    changes.push({value:value,row:row});
+                }},
+                {field:"status",title:"상태",renderer:function (value) {return value;}}
+            ],
+            onSelect:function (row) {selectionEvents.push(row);}
+        });
+
+        test("setRows deep copy, no input mutation", function () {
+            grid.setRows(initial);
+            initial[0].qty = 999;
+            check(grid.getRows()[0].qty === 10, "external mutation leaked in");
+        });
+        test("only key1 td is merged, rowspan=2, radio td remains on each row", function () {
+            var rows = table.tBodies[0].rows;
+            check(rows.length === 4);
+            check(rows[0].cells[1].rowSpan === 2, "first A colspan/rowspan wrong");
+            check(rows[1].cells.length === 4, "merged second row has extra td");
+            check(rows[2].cells[1].rowSpan === 2, "B merge wrong");
+            check(table.querySelectorAll("input[type=radio]").length === 4, "radio was merged");
+        });
+        test("native radio name must equal key1, one name per group", function () {
+            var radios = table.querySelectorAll("input[type=radio]");
+            same([radios[0].name, radios[1].name, radios[2].name, radios[3].name],
+                ["A","A","B","B"]);
+        });
+        test("original MPS-style table class and colgroup are retained", function () {
+            check(table.className === "existing-mps-table");
+            check(table.querySelector("colgroup") !== null);
+        });
+        test("untrusted row strings are rendered as text, not HTML", function () {
+            check(table.querySelectorAll("img").length === 0);
+            check(table.tBodies[0].rows[0].cells[4].textContent === "<img src=x>");
+        });
+        test("radio selection is independent per key1", function () {
+            var radios = table.querySelectorAll("input[type=radio]");
+            radios[1].checked = true;
+            signalChange(radios[1]);
+            radios[2].checked = true;
+            signalChange(radios[2]);
+            same(grid.getSelectedKeys(), [{key1:"A",key2:"02"},{key1:"B",key2:"01"}]);
+            check(selectionEvents.length === 2);
+        });
+        test("getSelectedRows returns original complete JSON objects, no wrapper", function () {
+            var chosen = grid.getSelectedRows();
+            same(chosen, [
+                {key1:"A",key2:"02",qty:20,status:"완료",hidden:101},
+                {key1:"B",key2:"01",qty:30,status:"대기",hidden:102}
+            ]);
+            chosen[0].qty = 1000;
+            check(grid.getSelectedRows()[0].qty === 20, "returned object leaked changes");
+        });
+        test("editor updates only the corresponding row", function () {
+            var editors = table.querySelectorAll('input[type="number"]');
+            editors[1].value = "25";
+            signalChange(editors[1]);
+            check(grid.getSelectedRows()[0].qty === 25);
+            check(grid.getRows()[0].qty === 10);
+            check(changes.length === 1 && changes[0].row.qty === 25);
+        });
+        test("render and setRows preserve valid composite-key selections", function () {
+            grid.render();
+            check(table.querySelectorAll('input[type="radio"]:checked').length === 2);
+            var all = grid.getRows();
+            all[0].qty = 11;
+            grid.setRows(all);
+            same(grid.getSelectedKeys(), [{key1:"A",key2:"02"},{key1:"B",key2:"01"}]);
+        });
+        test("setRows prunes deleted selection but retains remaining group", function () {
+            var filtered = grid.getRows().filter(function (r) {return r.key2 !== "02" || r.key1 !== "A";});
+            grid.setRows(filtered);
+            same(grid.getSelectedKeys(), [{key1:"B",key2:"01"}]);
+        });
+        test("setSelectedKeys restores selection and ignores unknown rows", function () {
+            grid.setSelectedKeys([{key1:"A",key2:"01"},{key1:"B",key2:"02"},{key1:"X",key2:"99"}]);
+            same(grid.getSelectedKeys(), [{key1:"A",key2:"01"},{key1:"B",key2:"02"}]);
+        });
+        test("updateRow can update only non-key fields", function () {
+            check(grid.updateRow({key1:"B",key2:"02"},{qty:88}) === true);
+            check(grid.getRows().filter(function (r) {return r.key1==="B"&&r.key2==="02";})[0].qty===88);
+            var rejected = false;
+            try {grid.updateRow({key1:"B",key2:"02"},{key1:"C"});} catch(e) {rejected=true;}
+            check(rejected);
+        });
+        test("duplicate composite key throws", function () {
+            var rejected = false;
+            try {grid.setRows([{key1:"X",key2:"01"},{key1:"X",key2:"01"}]);}
+            catch (e) {rejected=true;}
+            check(rejected);
+        });
+        test("non-contiguous same key1 is not illegally rowspan-merged", function () {
+            grid.setRows([
+                {key1:"A",key2:"01",qty:1},
+                {key1:"B",key2:"01",qty:2},
+                {key1:"A",key2:"02",qty:3}
+            ]);
+            var tr = table.tBodies[0].rows;
+            check(tr[0].cells.length === 5 && tr[2].cells.length === 5);
+            check(tr[0].cells[1].rowSpan === 1 && tr[2].cells[1].rowSpan === 1);
+            grid.setSelectedKeys([{key1:"A",key2:"02"},{key1:"B",key2:"01"}]);
+            check(grid.getSelectedRows().length === 2);
+        });
+        test("clearSelection and destroy release markup", function () {
+            grid.clearSelection();
+            check(grid.getSelectedRows().length === 0);
+            grid.destroy();
+            check(table.querySelectorAll("thead, tbody").length === 0);
+            check(table.className === "existing-mps-table");
+        });
+
+        var result = document.getElementById("results");
+        result.setAttribute("data-status", failed ? "fail" : "pass");
+        result.textContent = "RESULT: " + passed + " passed, " + failed +
+            " failed\n" + logs.join("\n");
+    }());
+    </script>
+</body>
+</html>

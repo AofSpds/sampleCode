@@ -1,0 +1,43 @@
+/* Demo skin ONLY. The library itself injects no CSS.
+   Use the genuine moorim.css + JSP table classes in production MPS. */
+body {
+    max-width: 1080px;
+    margin: 30px auto;
+    padding: 0 20px;
+    color: #333;
+    font: 13px/1.6 "Malgun Gothic", "Nanum Gothic", sans-serif;
+}
+h1 { font-size: 20px; margin-bottom: 4px; }
+h2 { font-size: 15px; margin-top: 24px; }
+small, .note { color: #666; }
+.controls { display: flex; flex-wrap: wrap; gap: 6px; margin: 16px 0; }
+button {
+    cursor: pointer;
+    border: 1px solid #aaa;
+    background: #f7f7f7;
+    padding: 6px 12px;
+    border-radius: 2px;
+}
+button:hover { background: #eee; }
+.demo-mps-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.demo-mps-table th, .demo-mps-table td {
+    border: 1px solid #d1d5da;
+    padding: 7px 9px;
+    text-align: center;
+}
+.demo-mps-table th { background: #f0f2f4; font-weight: bold; }
+.demo-mps-table tbody tr:hover td { background: #f8fafc; }
+.demo-mps-table input[type="number"] { box-sizing: border-box; width: 95%; }
+.demo-mps-table td.group-cell { font-weight: bold; background: #fafafa; }
+textarea, pre {
+    width: 100%;
+    min-height: 130px;
+    box-sizing: border-box;
+    padding: 10px;
+    border: 1px solid #ccd1d5;
+    border-radius: 3px;
+    background: #fbfbfb;
+    font: 12px/1.45 Consolas, monospace;
+}
+pre { overflow: auto; white-space: pre-wrap; }
+#message { min-height: 20px; color: #1d5e91; }

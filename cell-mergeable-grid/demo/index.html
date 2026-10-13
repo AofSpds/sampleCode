@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8">
+    <title>CellMergeableGrid Demo</title>
+    <link rel="stylesheet" href="demo.css">
+</head>
+<body>
+    <h1>CellMergeableGrid — key1 병합 + 그룹별 Radio</h1>
+    <div class="note">
+        JSP/MPS에 붙일 수 있는 독립 HTML table 컴포넌트 예제입니다.
+        아래 스타일은 데모용이며 실제 MPS에서는 기존 CSS/테이블 클래스를 사용합니다.
+    </div>
+
+    <div class="controls">
+        <button id="show-selected">선택 행 JSON 추출</button>
+        <button id="show-all">전체 JSON 추출</button>
+        <button id="rerender">재렌더링 (선택 유지)</button>
+        <button id="add-row">A / 03 행 추가</button>
+        <button id="clear">선택 해제</button>
+    </div>
+
+    <!-- Existing MPS table + actual classes can be used as the mount target. -->
+    <table id="grid" class="demo-mps-table">
+        <colgroup>
+            <col style="width: 9%">
+            <col style="width: 20%">
+            <col style="width: 20%">
+            <col style="width: 21%">
+            <col style="width: 30%">
+        </colgroup>
+    </table>
+
+    <h2>입력 JSON 배열</h2>
+    <textarea id="source" spellcheck="false"></textarea>
+    <div class="controls">
+        <button id="apply">JSON 입력 적용 (setRows)</button>
+    </div>
+
+    <h2>결과</h2>
+    <div id="message" aria-live="polite"></div>
+    <pre id="output">그룹별 Radio를 선택하고 「선택 행 JSON 추출」을 눌러보세요.</pre>
+
+    <script src="../CellMergeableGrid.js"></script>
+    <script>
+        (function () {
+            "use strict";
+            var initialRows = [
+                { key1: "A", key2: "01", qty: 10, status: "대기", hiddenId: "PR-100" },
+                { key1: "A", key2: "02", qty: 20, status: "완료", hiddenId: "PR-101" },
+                { key1: "B", key2: "01", qty: 30, status: "대기", hiddenId: "PR-102" },
+                { key1: "B", key2: "02", qty: 40, status: "완료", hiddenId: "PR-103" }
+            ];
+
+            var output = document.getElementById("output");
+            var source = document.getElementById("source");
+            var message = document.getElementById("message");
+
+            function report(label, value) {
+                message.textContent = label;
+                output.textContent = JSON.stringify(value, null, 2);
+            }
+
+            var grid = new CellMergeableGrid("#grid", {
+                keyFields: ["key1", "key2"],
+                columns: [
+                    { type: "radio", title: "선택" },
+                    { field: "key1", title: "구분", merge: true, className: "group-cell" },
+                    { field: "key2", title: "품목" },
+                    { field: "qty", title: "수량", editor: "number",
+                      onChange: function (value, row) {
+                          message.textContent = row.key1 + " / " + row.key2 + " 수량 변경: " + value;
+                      } },
+                    { field: "status", title: "상태",
+                      renderer: function (value) { return value; },
+                      onClick: function (row) { message.textContent = "상태 셀 클릭: " + row.key2; } }
+                ],
+                onSelect: function (row) {
+                    message.textContent = "선택: " + row.key1 + " / " + row.key2;
+                }
+            });
+
+            function applyRows(rows) {
+                grid.setRows(rows);
+                source.value = JSON.stringify(grid.getRows(), null, 2);
+            }
+
+            applyRows(initialRows);
+            grid.setSelectedKeys([{ key1: "A", key2: "02" }, { key1: "B", key2: "01" }]);
+
+            document.getElementById("show-selected").onclick = function () {
+                report("getSelectedRows(): 선택된 전체 행 JSON 배열", grid.getSelectedRows());
+            };
+            document.getElementById("show-all").onclick = function () {
+                report("getRows(): 전체 행 JSON 배열", grid.getRows());
+            };
+            document.getElementById("rerender").onclick = function () {
+                grid.render();
+                report("render() 후 선택 유지", grid.getSelectedKeys());
+            };
+            document.getElementById("add-row").onclick = function () {
+                var rows = grid.getRows();
+                var exists = rows.some(function (row) {
+                    return row.key1 === "A" && row.key2 === "03";
+                });
+                if (!exists) {
+                    rows.splice(2, 0, { key1: "A", key2: "03", qty: 50,
+                        status: "추가", hiddenId: "PR-104" });
+                    applyRows(rows);
+                }
+                report("행 추가 후 선택 유지", grid.getSelectedRows());
+            };
+            document.getElementById("clear").onclick = function () {
+                grid.clearSelection();
+                report("선택 해제", grid.getSelectedRows());
+            };
+            document.getElementById("apply").onclick = function () {
+                try {
+                    applyRows(JSON.parse(source.value));
+                    report("JSON 데이터 적용 (유효한 선택 유지)", grid.getSelectedRows());
+                } catch (e) {
+                    message.textContent = "입력 오류: " + e.message;
+                }
+            };
+        }());
+    </script>
+</body>
+</html>
