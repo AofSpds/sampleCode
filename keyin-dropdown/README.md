@@ -1,11 +1,11 @@
-# MPS Key-in Dropdown
+# Key-in Dropdown
 
-무림조달관리시스템(MPS)의 기존 `select` 스타일을 유지하면서 직접 입력(Key-in), 옵션 선택, X 초기화를 지원하는 공통 UI 예제입니다.
+레거시 시스템의 기존 `select` 스타일을 유지하면서 직접 입력(Key-in), 옵션 선택, X 초기화를 지원하는 공통 UI 예제입니다.
 
 ## 구성
 
-- `mps-keyin.js` — jQuery 공통 메서드 `$.fn.mpsKeyin`
-- `mps-keyin.css` — MPS 레거시 UI 호환 스타일
+- `keyin-dropdown.js` — jQuery 공통 메서드 `$.fn.keyinDropdown`
+- `keyin-dropdown.css` — 레거시 UI 호환 스타일
 - `demo.html` — 실행 예제
 
 **기본 의존성:** jQuery 1.9.1 및 jQuery UI Autocomplete. 독립 데모는 CDN을 사용합니다. 실제 JSP에서는 이미 로드된 jQuery, jQuery UI를 재사용하고 CSS/JS 파일만 추가하세요.
@@ -13,7 +13,7 @@
 ## JSP 예제
 
 ```html
-<span id="rTypeCombo" class="mps-keyin" style="width:150px">
+<span id="rTypeCombo" class="keyin-dropdown" style="width:150px">
     <input type="text" class="keyin-text" autocomplete="off" aria-label="구매요청유형">
     <input type="hidden" class="keyin-code" name="rTypeCd">
     <button type="button" class="keyin-clear" aria-label="입력 지우기">×</button>
@@ -23,7 +23,7 @@
 
 ```javascript
 $(function () {
-    $('#rTypeCombo').mpsKeyin({
+    $('#rTypeCombo').keyinDropdown({
         options: [
             { code: 'A', codeLabel: '자재' },
             { code: 'B', codeLabel: '시설투자' },
@@ -58,11 +58,11 @@ $(function () {
 
 ## 코딩 기준
 
-- 실제 제공된 MPS 코드 패턴에 맞춰 `$(function () {})`, `var`, jQuery `.on()` 이벤트를 사용
+- 실제 제공된 기존 프로젝트 코드 패턴에 맞춰 `$(function () {})`, `var`, jQuery `.on()` 이벤트를 사용
 - 콤보별 상태는 `.each()` 스코프 내부에 보관, 임의 전역 상태변수 없음
-- 화면에서 호출할 공개 API만 `$.fn.mpsKeyin`으로 한 개 등록
+- 화면에서 호출할 공개 API만 `$.fn.keyinDropdown`으로 한 개 등록
 - 기본 폭 130px, 개별 폭 및 펼친 목록 폭 조절 가능
 - 화살표의 왼쪽 구분선 없음, X는 값이 있을 때만 표시
 - 기존 jQuery UI Autocomplete에 필터링·방향키·Enter·Esc 처리를 위임
 
-**검증 범위:** 제공된 JSP/CSS 화면 정보와 공통 JS 발췌를 기준으로 정리한 초안입니다. MPS 전체 배포 환경에서의 동작 및 jQuery UI 버전·CSS 충돌 여부는 통합 확인이 필요합니다.
+**검증 범위:** 제공된 JSP/CSS 화면 정보와 공통 JS 발췌를 기준으로 정리한 초안입니다. 실제 배포 환경에서의 동작 및 jQuery UI 버전·CSS 충돌 여부는 통합 확인이 필요합니다.

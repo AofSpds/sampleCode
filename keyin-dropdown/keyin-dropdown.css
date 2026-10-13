@@ -1,5 +1,5 @@
-/* MPS select와 유사한 외형. 개별 폭은 style="width:150px"으로 조절한다. */
-.mps-keyin {
+/* 기존 select와 유사한 외형. 개별 폭은 style="width:150px"으로 조절한다. */
+.keyin-dropdown {
     position: relative;
     display: inline-block;
     vertical-align: middle;
@@ -12,7 +12,7 @@
     font: 12px Arial, sans-serif;
 }
 
-.mps-keyin input.keyin-text {
+.keyin-dropdown input.keyin-text {
     display: block;
     box-sizing: border-box;
     width: 100%;
@@ -27,8 +27,8 @@
 }
 
 /* 화살표 왼쪽 구분선 없음. */
-.mps-keyin button.keyin-clear,
-.mps-keyin button.keyin-arrow {
+.keyin-dropdown button.keyin-clear,
+.keyin-dropdown button.keyin-arrow {
     position: absolute;
     top: 0;
     height: 18px;
@@ -40,14 +40,14 @@
     font: 12px Arial, sans-serif;
     cursor: pointer;
 }
-.mps-keyin button.keyin-clear {
+.keyin-dropdown button.keyin-clear {
     display: none;
     right: 17px;
     width: 17px;
 }
-.mps-keyin.has-value button.keyin-clear { display: block; }
-.mps-keyin button.keyin-arrow { right: 0; width: 17px; }
-.mps-keyin button.keyin-arrow:after {
+.keyin-dropdown.has-value button.keyin-clear { display: block; }
+.keyin-dropdown button.keyin-arrow { right: 0; width: 17px; }
+.keyin-dropdown button.keyin-arrow:after {
     content: '';
     display: inline-block;
     margin-top: 5px;
@@ -56,7 +56,7 @@
 }
 
 /* jQuery UI 목록: code + codeLabel 표시. */
-.mps-keyin-menu.ui-autocomplete {
+.keyin-dropdown-menu.ui-autocomplete {
     z-index: 2000;
     max-height: 180px;
     overflow-y: auto;
@@ -66,8 +66,8 @@
     background: #fff;
     box-sizing: border-box;
 }
-.mps-keyin-menu .ui-menu-item a,
-.mps-keyin-menu .ui-menu-item .ui-menu-item-wrapper {
+.keyin-dropdown-menu .ui-menu-item a,
+.keyin-dropdown-menu .ui-menu-item .ui-menu-item-wrapper {
     display: block;
     padding: 4px 6px;
     margin: 0;
@@ -79,9 +79,9 @@
     text-decoration: none;
     white-space: nowrap;
 }
-.mps-keyin-menu .ui-menu-item a.ui-state-focus,
-.mps-keyin-menu .ui-menu-item .ui-state-focus,
-.mps-keyin-menu .ui-menu-item .ui-state-active {
+.keyin-dropdown-menu .ui-menu-item a.ui-state-focus,
+.keyin-dropdown-menu .ui-menu-item .ui-state-focus,
+.keyin-dropdown-menu .ui-menu-item .ui-state-active {
     padding: 4px 6px;
     margin: 0;
     border: 0;

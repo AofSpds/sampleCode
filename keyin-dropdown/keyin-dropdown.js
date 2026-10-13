@@ -1,8 +1,8 @@
 /**
- * MPS Key-in Dropdown (jQuery 1.9.1 + jQuery UI Autocomplete)
+ * Key-in Dropdown (jQuery 1.9.1 + jQuery UI Autocomplete)
  * - 콤보박스마다 독립 초기화 / 별도 전역 상태변수 없음
  */
-$.fn.mpsKeyin = function (settings) {
+$.fn.keyinDropdown = function (settings) {
     return this.each(function () {
         var $combo = $(this),
             $text = $combo.find('.keyin-text'),
@@ -17,7 +17,7 @@ $.fn.mpsKeyin = function (settings) {
             source = config.options != null ? config.options : $combo.find('.keyin-options option').get();
 
         // 동일 요소에 이벤트를 중복 등록하지 않는다.
-        if ($combo.data('mpsKeyinReady')) return;
+        if ($combo.data('keyinDropdownReady')) return;
 
         // JavaScript 배열 또는 기존 <option>을 동일한 형태로 변환한다.
         var items = $.map(source, function (option) {
@@ -50,8 +50,8 @@ $.fn.mpsKeyin = function (settings) {
                 return false; // 목록에서 이동할 때는 입력값을 바꾸지 않는다.
             },
             open: function () {
-                // MPS 검색영역의 overflow가 목록을 자르지 않도록 body에 표시한다.
-                $text.autocomplete('widget').addClass('mps-keyin-menu').outerWidth(
+                // 기존 화면의 검색영역의 overflow가 목록을 자르지 않도록 body에 표시한다.
+                $text.autocomplete('widget').addClass('keyin-dropdown-menu').outerWidth(
                     Math.max(config.listWidth, $combo.outerWidth())
                 );
             },
@@ -69,7 +69,7 @@ $.fn.mpsKeyin = function (settings) {
         });
 
         // 직접 입력: 선택된 코드 초기화 및 onKeyin 호출.
-        $text.on('input.mpsKeyin', function () {
+        $text.on('input.keyinDropdown', function () {
             $code.val('');
             fnSetClearButton();
 
@@ -79,12 +79,12 @@ $.fn.mpsKeyin = function (settings) {
         });
 
         // 입력창을 클릭하면 조건 없이 전체 옵션을 보여준다.
-        $text.on('click.mpsKeyin', function () {
+        $text.on('click.keyinDropdown', function () {
             $text.autocomplete('search', '');
         });
 
         // 화살표를 누르면 목록을 열거나 닫는다.
-        $combo.on('click.mpsKeyin', '.keyin-arrow', function () {
+        $combo.on('click.keyinDropdown', '.keyin-arrow', function () {
             var $list = $text.autocomplete('widget');
 
             if ($list.is(':visible')) {
@@ -95,7 +95,7 @@ $.fn.mpsKeyin = function (settings) {
         });
 
         // X 클릭: text, code를 비우고 onClear만 호출한다.
-        $combo.on('click.mpsKeyin', '.keyin-clear', function () {
+        $combo.on('click.keyinDropdown', '.keyin-clear', function () {
             $text.autocomplete('close').val('');
             $code.val('');
             fnSetClearButton();
@@ -105,7 +105,7 @@ $.fn.mpsKeyin = function (settings) {
             }
         });
 
-        $combo.data('mpsKeyinReady', true);
+        $combo.data('keyinDropdownReady', true);
         fnSetClearButton();
     });
 };
