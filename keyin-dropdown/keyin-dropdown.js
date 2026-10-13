@@ -1,5 +1,5 @@
 /**
- * Key-in Dropdown (jQuery 1.9.1 + jQuery UI Autocomplete)
+ * Key-in Dropdown (jQuery + jQuery UI Autocomplete)
  * - 콤보박스마다 독립 초기화 / 별도 전역 상태변수 없음
  */
 $.fn.keyinDropdown = function (settings) {

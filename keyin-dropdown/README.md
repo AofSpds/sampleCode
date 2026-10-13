@@ -8,7 +8,16 @@
 - `keyin-dropdown.css` — 레거시 UI 호환 스타일
 - `demo.html` — 실행 예제
 
-**기본 의존성:** jQuery 1.9.1 및 jQuery UI Autocomplete. 독립 데모는 CDN을 사용합니다. 실제 JSP에서는 이미 로드된 jQuery, jQuery UI를 재사용하고 CSS/JS 파일만 추가하세요.
+**기본 의존성:** jQuery 및 jQuery UI Autocomplete. **실제 적용 화면의 로딩 버전은 아직 확인되지 않았습니다.** 파일 목록에 `jquery-1.9.1.min.js`가 존재하더라도 실행 중인 버전이 1.9.1이라는 뜻은 아닙니다. 독립 데모에서 CDN으로 불러오는 버전은 예제 테스트용이며 운영 버전의 근거가 아닙니다. 실제 JSP에서는 이미 로드된 jQuery/jQuery UI를 재사용하고 CSS/JS 파일만 추가하세요.
+
+브라우저 콘솔에서 실행 버전을 확인합니다.
+
+```javascript
+jQuery.fn.jquery     // 현재 화면에서 실행되는 jQuery 버전
+jQuery.ui.version    // 현재 화면에서 실행되는 jQuery UI 버전 (UI가 로드된 경우)
+```
+
+두 버전 확인 후 해당 조합에서 이벤트·자동완성·목록 스타일을 검증해야 합니다.
 
 ## JSP 예제
 
