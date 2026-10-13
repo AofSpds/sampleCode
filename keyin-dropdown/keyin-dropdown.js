@@ -37,7 +37,7 @@ $.fn.keyinDropdown = function (settings) {
 
         // 입력값이 있을 때만 X 버튼을 표시한다.
         function fnSetClearButton() {
-            $combo.toggleClass('has-value', $.trim($text.val()).length > 0);
+            $combo.toggleClass('has-value', String($text.val() == null ? '' : $text.val()).replace(/^\s+|\s+$/g, '').length > 0);
         }
 
         // 목록 필터링 / 방향키 / Enter / ESC는 jQuery UI에서 처리한다.
@@ -61,7 +61,7 @@ $.fn.keyinDropdown = function (settings) {
                 $code.val(ui.item.code);
                 fnSetClearButton();
 
-                if ($.isFunction(config.onSelect)) {
+                if (typeof config.onSelect === 'function') {
                     config.onSelect.call(this, ui.item);
                 }
                 return false;
@@ -73,7 +73,7 @@ $.fn.keyinDropdown = function (settings) {
             $code.val('');
             fnSetClearButton();
 
-            if ($.isFunction(config.onKeyin)) {
+            if (typeof config.onKeyin === 'function') {
                 config.onKeyin.call(this, $text.val());
             }
         });
@@ -100,7 +100,7 @@ $.fn.keyinDropdown = function (settings) {
             $code.val('');
             fnSetClearButton();
 
-            if ($.isFunction(config.onClear)) {
+            if (typeof config.onClear === 'function') {
                 config.onClear.call($text[0]);
             }
         });
