@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>MPS Key-in Dropdown - 레거시 스타일 예제</title>
+<!-- 데모는 CDN 사용. 실제 MPS JSP에서는 기존 jQuery / jQuery UI를 중복 로드하지 않는다. -->
+<link rel="stylesheet" href="https://code.jquery.com/ui/1.10.4/themes/base/jquery-ui.css">
+<link rel="stylesheet" href="mps-keyin.css">
+<style>
+    body { margin: 10px; font: 12px Arial, sans-serif; color: #777; }
+    .terms { display: inline-block; margin-right: 18px; }
+    .terms .txt { display: inline-block; margin-right: 7px; }
+</style>
+</head>
+<body>
+<div class="search_area">
+    <!-- JavaScript 배열로 옵션을 지정하는 예제 -->
+    <span class="terms">
+        <span class="txt">구매요청유형</span>
+        <span id="rTypeCombo" class="mps-keyin" style="width:150px">
+            <input type="text" class="keyin-text" value="전체" aria-label="구매요청유형" autocomplete="off">
+            <input type="hidden" class="keyin-code" name="rTypeCd" value="ALL">
+            <button type="button" class="keyin-clear" aria-label="입력 지우기">×</button>
+            <button type="button" class="keyin-arrow" aria-label="옵션 열기"></button>
+        </span>
+    </span>
+
+    <!-- 기존 select/option으로 옵션을 지정하는 예제 -->
+    <span class="terms">
+        <span class="txt">상태</span>
+        <span id="statusCombo" class="mps-keyin">
+            <input type="text" class="keyin-text" value="견적진행" aria-label="상태" autocomplete="off">
+            <input type="hidden" class="keyin-code" name="statusCd" value="10">
+            <button type="button" class="keyin-clear" aria-label="입력 지우기">×</button>
+            <button type="button" class="keyin-arrow" aria-label="옵션 열기"></button>
+            <select class="keyin-options" style="display:none" tabindex="-1" aria-hidden="true">
+                <option value="00">전체</option>
+                <option value="10">견적진행</option>
+                <option value="20">견적마감</option>
+                <option value="30">견적취소</option>
+            </select>
+        </span>
+    </span>
+</div>
+
+<script src="https://code.jquery.com/jquery-1.9.1.min.js"></script>
+<script src="https://code.jquery.com/ui/1.10.4/jquery-ui.min.js"></script>
+<script src="mps-keyin.js"></script>
+<script>
+$(function () {
+    // 1. 옵션 및 이벤트 설정
+    $('#rTypeCombo').mpsKeyin({
+        options: [
+            { code: 'ALL', codeLabel: '전체' },
+            { code: 'A', codeLabel: '자재' },
+            { code: 'B', codeLabel: '시설투자' },
+            { code: 'C', codeLabel: '용역' },
+            { code: 'D', codeLabel: '장기 설비 유지보수 / 계약 견적 검토' }
+        ],
+        listWidth: 330,
+        onKeyin: function (text) {
+            console.log('직접 입력:', text);
+        },
+        onSelect: function (item) {
+            console.log('옵션 선택:', item.code, item.codeLabel);
+        },
+        onClear: function () {
+            console.log('초기화');
+        }
+    });
+
+    // 2. 기존 HTML <option> 읽기
+    $('#statusCombo').mpsKeyin({ listWidth: 220 });
+});
+</script>
+</body>
+</html>
