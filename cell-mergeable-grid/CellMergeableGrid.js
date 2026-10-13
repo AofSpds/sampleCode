@@ -358,7 +358,7 @@
 
     CellMergeableGrid.prototype.render = function () {
         this._assertAlive();
-        var oldSections = this.table.querySelectorAll("thead, tbody, tfoot");
+        var oldSections = this.table.querySelectorAll("thead, tbody");
         for (var s = oldSections.length - 1; s >= 0; s--) {
             oldSections[s].parentNode.removeChild(oldSections[s]);
         }
@@ -415,7 +415,7 @@
         if (this._ownsTable) {
             this.host.removeChild(this.table);
         } else {
-            var sections = this.table.querySelectorAll("thead, tbody, tfoot");
+            var sections = this.table.querySelectorAll("thead, tbody");
             for (var i = sections.length - 1; i >= 0; i--) {
                 sections[i].parentNode.removeChild(sections[i]);
             }
