@@ -35,6 +35,7 @@ $(function () {
         name: 'rTypeCd',       // 자동 생성하는 hidden 필드명
         initialCode: 'ALL',   // 화면에 표시한 '전체'에 해당하는 코드
         options: [
+            { code: 'ALL', codeLabel: '전체' },
             { code: 'A', codeLabel: '자재' },
             { code: 'B', codeLabel: '시설투자' },
             { code: 'C', codeLabel: '용역' }
