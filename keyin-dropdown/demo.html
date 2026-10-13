@@ -42,6 +42,17 @@
             </select>
         </span>
     </span>
+
+    <!-- AJAX에서 JSON 배열을 읽는 예제. HTTP로 실행해야 한다. -->
+    <span class="terms">
+        <span class="txt">동적옵션</span>
+        <span id="ajaxCombo" class="keyin-dropdown" style="width:160px">
+            <input type="text" class="keyin-text" placeholder="검색하거나 선택" aria-label="동적옵션" autocomplete="off">
+            <input type="hidden" class="keyin-code" name="ajaxCode">
+            <button type="button" class="keyin-clear" aria-label="입력 지우기">×</button>
+            <button type="button" class="keyin-arrow" aria-label="옵션 열기"></button>
+        </span>
+    </span>
 </div>
 
 <script src="https://code.jquery.com/jquery-1.9.1.min.js"></script>
@@ -72,6 +83,24 @@ $(function () {
 
     // 2. 기존 HTML <option> 읽기
     $('#statusCombo').keyinDropdown({ listWidth: 220 });
+
+    // 3. AJAX 동적 옵션 (로컬 HTTP 서버에서 mock-options.json 사용)
+    $('#ajaxCombo').keyinDropdown({
+        ajax: { url: 'mock-options.json', type: 'GET' },
+        listWidth: 280,
+        onSelect: function (item) {
+            console.log('AJAX 옵션 선택:', item.code, item.codeLabel);
+        },
+        onKeyin: function (text) {
+            console.log('AJAX 직접 입력:', text);
+        },
+        onClear: function () {
+            console.log('AJAX 초기화');
+        },
+        onError: function (xhr) {
+            console.warn('AJAX 조회 실패:', xhr.status);
+        }
+    });
 });
 </script>
 </body>

@@ -1,0 +1,30 @@
+[
+  {
+    "code": "00",
+    "codeLabel": "전체"
+  },
+  {
+    "code": "10",
+    "codeLabel": "견적진행"
+  },
+  {
+    "code": "20",
+    "codeLabel": "견적마감"
+  },
+  {
+    "code": "30",
+    "codeLabel": "견적취소"
+  },
+  {
+    "code": "40",
+    "codeLabel": "장기 설비 유지보수 계약 및 단가 검토"
+  },
+  {
+    "code": "50",
+    "codeLabel": "공급업체 선정"
+  },
+  {
+    "code": "60",
+    "codeLabel": "구매요청 접수"
+  }
+]

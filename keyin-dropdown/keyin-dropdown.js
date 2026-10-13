@@ -8,32 +8,38 @@ $.fn.keyinDropdown = function (settings) {
             $text = $combo.find('.keyin-text'),
             $code = $combo.find('.keyin-code'),
             config = $.extend({
-                options: null,       // [{ code:'A', codeLabel:'자재' }] / 생략 시 HTML option 사용
+                options: null,       // 고정 옵션. 생략 시 HTML <option> 사용
+                ajax: null,          // 동적 옵션: { url:'...', type:'GET', data:{...} }
                 listWidth: 260,      // 펼친 목록의 최소 너비(px)
                 onKeyin: null,       // 직접 입력 시 function(text) {}
                 onSelect: null,      // 선택 시 function(item) {}
-                onClear: null        // X 버튼 클릭 시 function() {}
+                onClear: null,       // X 버튼 클릭 시 function() {}
+                onError: null        // AJAX 조회 실패 시 function(xhr) {}
             }, settings),
             source = config.options != null ? config.options : $combo.find('.keyin-options option').get();
 
         // 동일 요소에 이벤트를 중복 등록하지 않는다.
         if ($combo.data('keyinDropdownReady')) return;
 
-        // JavaScript 배열 또는 기존 <option>을 동일한 형태로 변환한다.
-        var items = $.map(source, function (option) {
-            var code = option.nodeType ? option.value : option.code,
-                codeLabel = option.nodeType ? $(option).text() : option.codeLabel;
+        // 배열, HTML option, AJAX 응답을 공통 옵션 형식으로 변환한다.
+        function fnToItems(rows) {
+            return $.map(rows, function (option) {
+                var code = option.nodeType ? option.value : option.code,
+                    codeLabel = option.nodeType ? $(option).text() : option.codeLabel;
 
-            code = code == null ? '' : String(code);
-            codeLabel = codeLabel == null ? '' : String(codeLabel);
+                code = code == null ? '' : String(code);
+                codeLabel = codeLabel == null ? '' : String(codeLabel);
 
-            return {
-                code: code,
-                codeLabel: codeLabel,
-                value: codeLabel,                 // 선택 후 표시값
-                label: code + '  ' + codeLabel    // 펼친 목록: code + codeLabel
-            };
-        });
+                return {
+                    code: code,
+                    codeLabel: codeLabel,
+                    value: codeLabel,                 // 선택 후 입력창: codeLabel
+                    label: code + '  ' + codeLabel    // 펼친 목록: code + codeLabel
+                };
+            });
+        }
+
+        var items = fnToItems(source);
 
         // 입력값이 있을 때만 X 버튼을 표시한다.
         function fnSetClearButton() {
@@ -42,9 +48,36 @@ $.fn.keyinDropdown = function (settings) {
 
         // 목록 필터링 / 방향키 / Enter / ESC는 jQuery UI에서 처리한다.
         $text.autocomplete({
-            source: items,
+            // ajax 설정 시 입력할 때마다 서버 조회. 없으면 기존 고정 옵션을 사용한다.
+            source: config.ajax && config.ajax.url ? function (request, response) {
+                var extra = typeof config.ajax.data === 'function'
+                    ? config.ajax.data.call($combo[0]) : config.ajax.data;
+
+                $.ajax({
+                    url: config.ajax.url,
+                    type: config.ajax.type || 'GET',
+                    dataType: 'json',
+                    data: $.extend({}, extra, { term: request.term }),
+                    success: function (rows) {
+                        // 응답 형식: [{code:'10', codeLabel:'견적진행'}, ...]
+                        // 테스트용 JSON이 전체 목록을 반환해도 검색어로 필터링한다.
+                        var list = fnToItems($.isArray(rows) ? rows : []),
+                            term = request.term.toLowerCase();
+
+                        response($.grep(list, function (item) {
+                            return item.label.toLowerCase().indexOf(term) !== -1;
+                        }));
+                    },
+                    error: function (xhr) {
+                        response([]); // 반드시 완료 콜백을 호출하여 로딩 상태를 해제한다.
+                        if (typeof config.onError === 'function') {
+                            config.onError.call($text[0], xhr);
+                        }
+                    }
+                });
+            } : items,
             minLength: 0,
-            delay: 0,
+            delay: config.ajax && config.ajax.url ? 200 : 0,
             appendTo: 'body',
             focus: function () {
                 return false; // 목록에서 이동할 때는 입력값을 바꾸지 않는다.
