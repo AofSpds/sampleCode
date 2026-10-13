@@ -15,16 +15,16 @@
 </head>
 <body>
 <div class="search_area">
-    <!-- JavaScript 배열로 옵션을 지정하는 예제 -->
-    <span class="terms">
-        <span class="txt">구매요청유형</span>
-        <span id="rTypeCombo" class="keyin-dropdown" style="width:150px">
-            <input type="text" class="keyin-text" value="전체" aria-label="구매요청유형" autocomplete="off">
-            <input type="hidden" class="keyin-code" name="rTypeCd" value="ALL">
-            <button type="button" class="keyin-clear" aria-label="입력 지우기">×</button>
-            <button type="button" class="keyin-arrow" aria-label="옵션 열기"></button>
-        </span>
-    </span>
+    <!-- JSP td 안에는 input 하나만 배치. 콤보 내부 요소는 JS가 생성한다. -->
+    <table style="table-layout:fixed; border-collapse:collapse; width:420px;">
+        <tr>
+            <th style="width:95px;">구매요청유형</th>
+            <td colspan="3" style="border:1px solid #ddd; padding:4px;">
+                <input type="text" id="rTypeCombo" style="width:150px"
+                       value="전체" aria-label="구매요청유형" autocomplete="off">
+            </td>
+        </tr>
+    </table>
 
     <!-- 기존 select/option으로 옵션을 지정하는 예제 -->
     <span class="terms">
@@ -62,6 +62,8 @@
 $(function () {
     // 1. 옵션 및 이벤트 설정
     $('#rTypeCombo').keyinDropdown({
+        name: 'rTypeCd',
+        initialCode: 'ALL',
         options: [
             { code: 'ALL', codeLabel: '전체' },
             { code: 'A', codeLabel: '자재' },

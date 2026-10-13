@@ -23,17 +23,17 @@ jQuery.ui.version    // 현재 화면에서 실행되는 jQuery UI 버전 (UI가
 ## JSP 예제
 
 ```html
-<span id="rTypeCombo" class="keyin-dropdown" style="width:150px">
-    <input type="text" class="keyin-text" autocomplete="off" aria-label="구매요청유형">
-    <input type="hidden" class="keyin-code" name="rTypeCd">
-    <button type="button" class="keyin-clear" aria-label="입력 지우기">×</button>
-    <button type="button" class="keyin-arrow" aria-label="옵션 열기"></button>
-</span>
+<td colspan="3">
+    <input type="text" id="rTypeCombo" style="width:150px"
+           value="전체" autocomplete="off" aria-label="구매요청유형">
+</td>
 ```
 
 ```javascript
 $(function () {
     $('#rTypeCombo').keyinDropdown({
+        name: 'rTypeCd',       // 자동 생성하는 hidden 필드명
+        initialCode: 'ALL',   // 화면에 표시한 '전체'에 해당하는 코드
         options: [
             { code: 'A', codeLabel: '자재' },
             { code: 'B', codeLabel: '시설투자' },
@@ -143,3 +143,25 @@ python -m http.server 8000
 브라우저에서 `http://localhost:8000/demo.html`을 열면 됩니다. 독립 데모는 CDN에서 jQuery / jQuery UI를 로드하므로 인터넷 연결이 필요합니다. 실제 JSP에서는 이미 로드된 파일을 재사용하세요.
 
 주의: 실제 API가 `{"list":[...]}`와 같은 객체로 응답한다면 AJAX `success` 부분에서 목록 필드 추출을 추가해야 합니다. 현재 기본 계약은 최상위 JSON 배열입니다.
+
+## 테이블 셀(`td`) 사용 및 바인딩 확인
+
+기존 `<td>` 구조에는 **`<input>` 하나만** 추가할 수 있습니다. `keyinDropdown()`이 필요한 `span`, hidden 코드 필드, X/화살표 버튼을 생성하며, 기존 `<span class="keyin-dropdown">...` 마크업도 계속 지원합니다.
+
+- **중요:** `<td colspan="3">` 자체는 변경하지 말고, `<input style="width:150px">`처럼 콤보만 px 단위로 제한하세요. 셀 안에서 `width:100%`를 사용하면 병합 셀 너비를 모두 차지합니다.
+- 실제 테이블 행이 AJAX로 생성된다면 행을 DOM에 추가한 **후** `$('#rTypeCombo').keyinDropdown(...)`을 호출해야 합니다. `$(function(){})`은 초기 문서의 DOM 준비만 보장합니다.
+- `options`는 jQuery UI Autocomplete의 데이터 소스이므로 DOM에 실제 `<option>` 태그가 추가되지는 않습니다. 클릭 또는 화살표를 눌러 목록을 확인하세요.
+- `initialCode`는 최초에 표시한 텍스트에 대응하는 hidden 코드입니다. 직접 입력 시 코드가 공백으로 바뀝니다.
+- 필수 선행 조건은 jQuery, jQuery UI Autocomplete, 이 플러그인의 JS/CSS 정상 로드입니다.
+
+팝업 콘솔 진단:
+
+```javascript
+$('#rTypeCombo').length                       // 1이어야 함
+typeof $.fn.keyinDropdown                     // 'function'이어야 함
+typeof $.fn.autocomplete                      // 'function'이어야 함
+$('#rTypeCombo').data('keyinDropdownReady')   // 초기화 후 true
+$('#rTypeCombo').autocomplete('option', 'source') // 고정 options면 배열 반환
+```
+
+`$('#rTypeCombo').length === 0`이면 초기화 실행 시점에 해당 입력창이 DOM에 없는 것입니다. `td` 마크업이 없는 행이나 다른 팝업 문서에서 초기화를 실행하지 않았는지 확인하세요.

@@ -4,22 +4,61 @@
  */
 $.fn.keyinDropdown = function (settings) {
     return this.each(function () {
-        var $combo = $(this),
-            $text = $combo.find('.keyin-text'),
-            $code = $combo.find('.keyin-code'),
+        var $target = $(this),
             config = $.extend({
                 options: null,       // 고정 옵션. 생략 시 HTML <option> 사용
                 ajax: null,          // 동적 옵션: { url:'...', type:'GET', data:{...} }
+                name: null,          // 자동 생성할 hidden 필드 name
+                initialCode: null,   // 최초 표시값에 대응하는 코드 (선택)
                 listWidth: 260,      // 펼친 목록의 최소 너비(px)
                 onKeyin: null,       // 직접 입력 시 function(text) {}
-                onSelect: null,      // 선택 시 function(item) {}
+                onSelect: null,      // 옵션 선택 시 function(item) {}
                 onClear: null,       // X 버튼 클릭 시 function() {}
                 onError: null        // AJAX 조회 실패 시 function(xhr) {}
             }, settings),
-            source = config.options != null ? config.options : $combo.find('.keyin-options option').get();
+            $combo, $text, $code, source;
 
-        // 동일 요소에 이벤트를 중복 등록하지 않는다.
-        if ($combo.data('keyinDropdownReady')) return;
+        // 같은 입력창을 중복 초기화하지 않는다.
+        if ($target.data('keyinDropdownReady')) return;
+        if (typeof $.fn.autocomplete !== 'function') {
+            throw new Error('keyinDropdown: jQuery UI autocomplete가 필요합니다.');
+        }
+
+        if ($target.is('input')) {
+            // <td><input id="..." style="width:150px"></td> 형태를 지원한다.
+            // 테이블의 셀 크기는 건드리지 않고 컨트롤에만 고정 폭을 적용한다.
+            var width = $target[0].style.width || '130px';
+            $text = $target;
+            $text.wrap('<span class="keyin-dropdown"></span>');
+            $combo = $text.parent().css('width', width);
+            $text.addClass('keyin-text').removeClass('keyin-dropdown');
+            $text[0].style.width = '';
+
+            // 표시값과 코드값을 분리하여 기존 JSP 전송 구조를 유지한다.
+            $code = $('<input type="hidden" class="keyin-code">').appendTo($combo);
+            $combo.append(
+                '<button type="button" class="keyin-clear" aria-label="입력 지우기">×</button>' +
+                '<button type="button" class="keyin-arrow" aria-label="옵션 열기"></button>'
+            );
+            if (config.initialCode !== null) {
+                $code.val(config.initialCode);
+            } else if ($text.attr('data-code') !== undefined) {
+                $code.val($text.attr('data-code'));
+            }
+        } else {
+            // 이전의 <span class="keyin-dropdown"> 구조도 그대로 지원한다.
+            $combo = $target;
+            $text = $combo.find('.keyin-text');
+            $code = $combo.find('.keyin-code');
+        }
+
+        if (!$text.length || !$code.length) {
+            throw new Error('keyinDropdown: 입력창 또는 코드 필드가 없습니다.');
+        }
+        if (config.name && !$code.attr('name')) {
+            $code.attr('name', config.name);
+        }
+        source = config.options != null ? config.options : $combo.find('.keyin-options option').get();
 
         // 배열, HTML option, AJAX 응답을 공통 옵션 형식으로 변환한다.
         function fnToItems(rows) {
@@ -154,6 +193,7 @@ $.fn.keyinDropdown = function (settings) {
         });
 
         $combo.data('keyinDropdownReady', true);
+        $text.data('keyinDropdownReady', true);
         fnSetClearButton();
     });
 };
