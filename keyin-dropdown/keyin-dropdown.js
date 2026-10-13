@@ -35,6 +35,16 @@ $.fn.keyinDropdown = function (settings) {
             };
         });
 
+        // 다른 콤보박스를 열 때 기존 목록이 화면에 남지 않도록 닫는다.
+        function fnCloseOtherDropdowns() {
+            $('.keyin-dropdown').not($combo).each(function () {
+                var $other = $(this);
+                if ($other.data('keyinDropdownReady')) {
+                    $other.find('.keyin-text').autocomplete('close');
+                }
+            });
+        }
+
         // 입력값이 있을 때만 X 버튼을 표시한다.
         function fnSetClearButton() {
             $combo.toggleClass('has-value', String($text.val() == null ? '' : $text.val()).replace(/^\s+|\s+$/g, '').length > 0);
@@ -51,7 +61,7 @@ $.fn.keyinDropdown = function (settings) {
             },
             open: function () {
                 // 기존 화면의 검색영역의 overflow가 목록을 자르지 않도록 body에 표시한다.
-                $text.autocomplete('widget').addClass('keyin-dropdown-menu').outerWidth(
+                $text.autocomplete('widget').outerWidth(
                     Math.max(config.listWidth, $combo.outerWidth())
                 );
             },
@@ -67,6 +77,13 @@ $.fn.keyinDropdown = function (settings) {
                 return false;
             }
         });
+
+        // 메뉴 위치 계산 이전부터 목록 CSS가 적용되도록 생성 직후 클래스 지정.
+        // jQuery UI 테마 CSS가 누락되어도 목록 위치와 크기가 유지된다.
+        $text.autocomplete('widget').addClass('keyin-dropdown-menu');
+
+        // 다른 콤보로 포커스가 이동하면 이전 목록을 닫는다.
+        $text.on('focus.keyinDropdown', fnCloseOtherDropdowns);
 
         // 직접 입력: 선택된 코드 초기화 및 onKeyin 호출.
         $text.on('input.keyinDropdown', function () {

@@ -8,7 +8,7 @@
 - `keyin-dropdown.css` — 레거시 UI 호환 스타일
 - `demo.html` — 실행 예제
 
-**기본 의존성:** jQuery 및 jQuery UI Autocomplete. **실제 적용 화면의 로딩 버전은 아직 확인되지 않았습니다.** 파일 목록에 `jquery-1.9.1.min.js`가 존재하더라도 실행 중인 버전이 1.9.1이라는 뜻은 아닙니다. 독립 데모에서 CDN으로 불러오는 버전은 예제 테스트용이며 운영 버전의 근거가 아닙니다. 실제 JSP에서는 이미 로드된 jQuery/jQuery UI를 재사용하고 CSS/JS 파일만 추가하세요.
+**기본 의존성:** 사용자가 확인한 jQuery **1.9.1** 및 jQuery UI Autocomplete. **jQuery UI 버전은 미확인**이며, 독립 데모의 UI 1.10.4는 예시 버전입니다. 실제 JSP에서는 이미 로드된 jQuery/jQuery UI를 재사용하고 CSS/JS 파일만 추가하세요.
 
 브라우저 콘솔에서 실행 버전을 확인합니다.
 
@@ -17,7 +17,7 @@ jQuery.fn.jquery     // 현재 화면에서 실행되는 jQuery 버전
 jQuery.ui.version    // 현재 화면에서 실행되는 jQuery UI 버전 (UI가 로드된 경우)
 ```
 
-두 버전 확인 후 해당 조합에서 이벤트·자동완성·목록 스타일을 검증해야 합니다. **독립 데모**는 jQuery 3.7.1과 jQuery UI 1.13.3을 예시로 사용하며, 이것이 운영 시스템의 버전이나 공식 지원 범위를 확정하지는 않습니다.
+실제 화면의 jQuery UI 버전을 확인한 후 자동완성 동작을 최종 검증해야 합니다. **독립 데모**는 jQuery 1.9.1과 jQuery UI 1.10.4를 예시로 사용합니다.
 
 ## JSP 예제
 
@@ -75,3 +75,17 @@ $(function () {
 - 기존 jQuery UI Autocomplete에 필터링·방향키·Enter·Esc 처리를 위임
 
 **검증 범위:** 제공된 JSP/CSS 화면 정보와 공통 JS 발췌를 기준으로 정리한 초안입니다. 실제 배포 환경에서의 동작 및 jQuery UI 버전·CSS 충돌 여부는 통합 확인이 필요합니다.
+
+
+## 화면 버그 수정 (2026-10-13)
+
+증상: `4 results are available...` 안내 문구가 화면에 노출되고, 드롭다운 옵션 목록이 다른 컨트롤과 겹치거나 잘못 배치됨.
+
+- 원인 추정: jQuery UI 기본 테마 CSS 미적용/충돌로 `.ui-helper-hidden-accessible` 및 `.ui-autocomplete` 기본 스타일이 누락됨
+- CSS 보완: 접근성 안내 영역을 화면에서만 숨기고(스크린리더 접근 유지), 자동완성 목록에 `position: absolute`, 기본 리스트 스타일 적용
+- JS 보완: 자동완성 메뉴에 `.keyin-dropdown-menu` 클래스를 **최초 메뉴 오픈 전에** 지정하여 위치 계산에 반영. 다른 콤보로 포커스 이동 시 이전 목록 닫기
+- 가변폭, X 초기화, `options`, `onKeyin`, `onSelect`, `onClear` 기능 유지
+
+가능하면 실제 프로젝트에서 기존 jQuery UI CSS가 정상 로드되는지도 확인하세요. 본 CSS는 필수 최소 스타일을 보완하지만 jQuery UI 전체 테마를 대체하는 목적은 아닙니다.
+
+브라우저 렌더링 확인은 CSS를 적용한 독립 테스트 DOM에서 수행했습니다. 운영 JSP의 전체 이벤트 경로 및 실제 jQuery UI 버전 조합은 현장 검증이 필요합니다.
