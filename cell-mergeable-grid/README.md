@@ -1,6 +1,6 @@
 # CellMergeableGrid
 
-JSP / jQuery-based legacy MPS screens can use this dependency-free JavaScript component without introducing a separate grid library. It renders a JSON array as a normal HTML table, merges **only key1 cells** with rowspan, and creates **one radio per row**.
+JSP / jQuery-based legacy screens can use this dependency-free JavaScript component without introducing a separate grid library. It renders a JSON array as a normal HTML table, merges **only key1 cells** with rowspan, and creates **one radio per row**.
 
 ## Behavior
 
@@ -18,13 +18,13 @@ JSP / jQuery-based legacy MPS screens can use this dependency-free JavaScript co
 
 The component **does not sort or rearrange rows**. To merge all records belonging to one key1 into a single cell, supply rows grouped contiguously by key1. Noncontiguous occurrences still belong to the same radio group, but render as separate rowspan runs.
 
-## Usage in an existing MPS JSP
+## Usage in an existing JSP
 
-Use the original MPS table element (and its **actual** project CSS class). The example class is a placeholder, not a claim about moorim.css selectors.
+Use an existing table element and its actual CSS class. The example class below is a placeholder; match your application's selectors.
 
 ~~~html
 <!-- Keep the CSS classes and optional colgroup from the existing JSP. -->
-<table id="purchaseGrid" class="YOUR_EXISTING_MPS_TABLE_CLASS"></table>
+<table id="purchaseGrid" class="YOUR_EXISTING_TABLE_CLASS"></table>
 <script src="/your-static-path/CellMergeableGrid.js"></script>
 <script>
 var grid = new CellMergeableGrid("#purchaseGrid", {
@@ -77,7 +77,7 @@ With A/02 and B/01 selected, getSelectedRows() returns:
 - options: [{value, label}] — options for editor: "select".
 - onClick: function(row, ctx, event) — cell click handler.
 - onChange: function(value, row, ctx) — editor's change handler.
-- className, headerClass — optionally reuse existing MPS CSS classes for td/th.
+- className, headerClass — optionally reuse existing table CSS classes for td/th.
 
 The ctx object contains { rowIndex, field, key, grid }; ctx.key uses both configured key field names. onSelect(row, ctx) and onCellChange(value, row, ctx) are grid-level callbacks.
 
@@ -101,9 +101,9 @@ getRows() and getSelectedRows() return independent JSON copies. Editing the retu
 
 ## Styling and integration boundaries
 
-**The component does not include or override MPS CSS.** Passing an existing table (instead of an empty div) retains its class attribute and colgroup, while generating only thead/tbody rows and cells. Optional tableClass, rowClass and column className/headerClass can reuse selectors from the actual JSP/moorim.css.
+**The component does not include or override application CSS.** Passing an existing table (instead of an empty div) retains its class attribute and colgroup, while generating only thead/tbody rows and cells. Optional tableClass, rowClass and column className/headerClass can reuse selectors from the actual JSP and stylesheet.
 
-The demo uses demo/demo.css **only as an illustrative skin**. The actual moorim.css source and representative table markup were not included in this package; do not assume the demo's colors, spacing or selectors exactly match production MPS.
+The demo uses demo/demo.css **only as an illustrative skin**. An application's stylesheet and representative table markup are not included; do not assume the demo's colors, spacing or selectors exactly match your project.
 
 By default, radio name is the key1 string **without a prefix** as requested. If multiple grids on the same HTML page contain the same key1 values, HTML's global radio-name behavior can conflict. In that case set radioNamePrefix to a unique per-grid prefix (the name remains derived from key1), or otherwise isolate the groups in their own form.
 
@@ -115,6 +115,6 @@ Key fields must be non-null JSON scalars and should be consistently typed; key c
 - Open tests/browser-tests.html in a browser; the page reports pass/fail.
 - No npm install, build tooling or jQuery required.
 
-## Suggested MPS placement
+## Integration placement
 
-When integrating into the actual MPS project (not this sample repository), copy CellMergeableGrid.js under the existing static JavaScript area and mount it on an original MPS table. Consult the actual include/css/moorim.css and JSP for exact selectors before making pixel-fidelity claims.
+When integrating into an application, copy CellMergeableGrid.js under its static JavaScript area and mount it on an existing table. Consult the application's stylesheet and page markup for exact selectors before making pixel-fidelity claims.

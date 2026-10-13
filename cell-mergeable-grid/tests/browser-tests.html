@@ -6,7 +6,7 @@
 </head>
 <body>
     <h1>CellMergeableGrid Browser Tests</h1>
-    <table id="grid" class="existing-mps-table">
+    <table id="grid" class="existing-table">
         <colgroup><col><col><col><col><col></colgroup>
     </table>
     <pre id="results" data-status="running">RUNNING</pre>
@@ -80,8 +80,8 @@
             same([radios[0].name, radios[1].name, radios[2].name, radios[3].name],
                 ["A","A","B","B"]);
         });
-        test("original MPS-style table class and colgroup are retained", function () {
-            check(table.className === "existing-mps-table");
+        test("original table class and colgroup are retained", function () {
+            check(table.className === "existing-table");
             check(table.querySelector("colgroup") !== null);
         });
         test("untrusted row strings are rendered as text, not HTML", function () {
@@ -161,7 +161,7 @@
             check(grid.getSelectedRows().length === 0);
             grid.destroy();
             check(table.querySelectorAll("thead, tbody").length === 0);
-            check(table.className === "existing-mps-table");
+            check(table.className === "existing-table");
         });
 
         var result = document.getElementById("results");

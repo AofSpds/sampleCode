@@ -1,7 +1,7 @@
 /*
  * CellMergeableGrid v1.0
  * Dependency-free, browser-global / CommonJS. No component CSS is injected.
- * Designed to reuse an existing MPS <table> and its CSS classes.
+ * Designed to reuse an existing HTML table and its CSS classes.
  */
 (function (root, factory) {
     if (typeof module === "object" && module.exports) {
