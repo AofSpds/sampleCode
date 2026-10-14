@@ -1,112 +1,98 @@
 /**
- * Key-in Dropdown
- * jQuery + jQuery UI Autocomplete / input 전용
- * 사용: $('#rTypeCombo').keyinDropdown({ options: [...], onSelect: function (item) {} });
+ * Key-in Dropdown (jQuery + jQuery UI Autocomplete)
+ * - input 전용. 부모 span을 생성하거나 테이블 구조를 변경하지 않는다.
+ * - 코드/버튼은 원본 input의 바로 다음 형제 요소로 추가한다.
  */
 $.fn.keyinDropdown = function (settings) {
     return this.each(function () {
-        var $text = $(this);
+        var $input = $(this);
 
-        // 같은 입력창을 중복 초기화하지 않는다.
-        if ($text.data('keyinDropdownReady')) return;
-        if (!$text.is('input')) {
-            throw new Error('keyinDropdown: input 요소에만 사용할 수 있습니다.');
+        if (!$input.is('input')) {
+            throw new Error('keyinDropdown: input 요소만 지원합니다.');
         }
+        if ($input.data('keyinDropdownReady')) return;
         if (typeof $.fn.autocomplete !== 'function') {
-            throw new Error('keyinDropdown: jQuery UI Autocomplete가 필요합니다.');
+            throw new Error('keyinDropdown: jQuery UI autocomplete가 필요합니다.');
         }
 
         var config = $.extend({
-                options: [],        // [{ code:'A', codeLabel:'자재' }]
-                ajax: null,         // { url:'...', type:'GET', data:{...} }
-                name: '',           // 서버로 전달할 hidden code 필드명
-                initialCode: '',    // 최초 선택된 코드 (선택)
-                listWidth: 260,     // 펼친 옵션 목록의 최소 폭(px)
-                onKeyin: null,      // 직접 입력 이벤트 function(text) {}
-                onSelect: null,     // 옵션 선택 이벤트 function(item) {}
-                onClear: null,      // X 초기화 이벤트 function() {}
-                onError: null       // AJAX 오류 이벤트 function(xhr) {}
+                options: [],       // [{ code: 'A', codeLabel: '자재' }]
+                ajax: null,        // { url: '...', type: 'GET', data: {} }
+                name: '',          // hidden 코드의 name
+                initialCode: '',   // 최초 선택된 코드
+                listWidth: 260,    // 펼친 옵션 목록의 최소 폭(px)
+                onKeyin: null,     // 직접 입력: function(text) {}
+                onSelect: null,    // 옵션 선택: function(item) {}
+                onClear: null,     // X 클릭: function() {}
+                onError: null      // AJAX 실패: function(xhr) {}
             }, settings),
-            width = $text.outerWidth();
+            $code = $('<input type="hidden" class="keyin-code">'),
+            $clear = $('<button type="button" class="keyin-clear" aria-label="입력 지우기">×</button>'),
+            $arrow = $('<button type="button" class="keyin-arrow" aria-label="옵션 열기"></button>');
 
-        // JSP에는 input만 배치하고, 콤보 구성 요소는 여기에서 만든다.
-        $text.wrap('<span class="keyin-dropdown"></span>');
-        var $combo = $text.parent().outerWidth(width),
-            $code = $('<input type="hidden" class="keyin-code">').appendTo($combo);
-
-        $text.addClass('keyin-text').removeClass('keyin-dropdown');
-        $text[0].style.width = ''; // 기존 input의 인라인 width를 wrapper로 이전
-
+        // 기존 input의 width/style/id는 그대로 사용한다. span 생성 없음.
+        $input.addClass('keyin-dropdown').after($code, $clear, $arrow);
         if (config.name) $code.attr('name', config.name);
-        $code.val(config.initialCode || $text.attr('data-code') || '');
-        $combo.append(
-            '<button type="button" class="keyin-clear" aria-label="입력 지우기">×</button>' +
-            '<button type="button" class="keyin-arrow" aria-label="옵션 열기"></button>'
-        );
+        $code.val(config.initialCode || $input.attr('data-code') || '');
 
-        // 코드 목록을 Autocomplete의 {label, value} 형식으로 변환한다.
-        function fnToItems(rows) {
+        function toItems(rows) {
             return $.map(rows || [], function (item) {
                 var code = item.code == null ? '' : String(item.code),
-                    codeLabel = item.codeLabel == null ? '' : String(item.codeLabel);
+                    label = item.codeLabel == null ? '' : String(item.codeLabel);
 
                 return {
                     code: code,
-                    codeLabel: codeLabel,
-                    label: code + '  ' + codeLabel, // 목록 표시값
-                    value: codeLabel               // 선택 후 입력창 표시값
+                    codeLabel: label,
+                    label: code + '  ' + label, // 목록에 코드 + 명칭 표시
+                    value: label               // 선택 후에는 명칭만 표시
                 };
             });
         }
 
-        // 입력값이 존재할 때만 X 버튼을 표시한다.
-        function fnSetClearButton() {
-            $combo.toggleClass('has-value', $.trim($text.val() || '') !== '');
+        // 값이 있을 때만 X 버튼 표시. 별도 상태변수는 사용하지 않는다.
+        function setClear() {
+            $clear.toggleClass('is-visible', $.trim($input.val() || '') !== '');
         }
 
-        // 고정 options 또는 AJAX 조회 결과를 목록에 표시한다.
-        $text.autocomplete({
+        $input.autocomplete({
             source: config.ajax && config.ajax.url ? function (request, response) {
-                var params = typeof config.ajax.data === 'function'
-                    ? config.ajax.data.call($text[0]) : config.ajax.data;
+                var extra = typeof config.ajax.data === 'function'
+                    ? config.ajax.data.call($input[0]) : config.ajax.data;
 
                 $.ajax({
                     url: config.ajax.url,
                     type: config.ajax.type || 'GET',
                     dataType: 'json',
-                    data: $.extend({}, params, { term: request.term }),
+                    data: $.extend({}, extra, { term: request.term }),
                     success: function (rows) {
-                        var items = fnToItems($.isArray(rows) ? rows : []),
-                            term = request.term.toLowerCase();
-
-                        response($.grep(items, function (item) {
+                        var term = request.term.toLowerCase();
+                        response($.grep(toItems($.isArray(rows) ? rows : []), function (item) {
                             return item.label.toLowerCase().indexOf(term) !== -1;
                         }));
                     },
                     error: function (xhr) {
                         response([]);
                         if (typeof config.onError === 'function') {
-                            config.onError.call($text[0], xhr);
+                            config.onError.call($input[0], xhr);
                         }
                     }
                 });
-            } : fnToItems(config.options),
+            } : toItems(config.options),
             minLength: 0,
             delay: config.ajax && config.ajax.url ? 200 : 0,
-            appendTo: 'body',
+            appendTo: 'body', // td의 overflow에 목록이 잘리지 않게 한다.
             focus: function () {
-                return false; // 키보드 이동 중 입력창 값을 변경하지 않는다.
+                return false; // 키보드 이동 중 입력값 변경 방지
             },
             open: function () {
-                $text.autocomplete('widget').outerWidth(
-                    Math.max(config.listWidth, $combo.outerWidth())
+                $input.autocomplete('widget').outerWidth(
+                    Math.max(config.listWidth, $input.outerWidth())
                 );
             },
             select: function (event, ui) {
-                $text.val(ui.item.codeLabel);
+                $input.val(ui.item.codeLabel);
                 $code.val(ui.item.code);
-                fnSetClearButton();
-
+                setClear();
                 if (typeof config.onSelect === 'function') {
                     config.onSelect.call(this, ui.item);
                 }
@@ -114,42 +100,38 @@ $.fn.keyinDropdown = function (settings) {
             }
         });
 
-        // 메뉴가 열리기 전부터 CSS가 적용되도록 클래스를 지정한다.
-        $text.autocomplete('widget').addClass('keyin-dropdown-menu');
+        // 최초 목록 오픈 전에 메뉴 전용 CSS 클래스 설정
+        $input.autocomplete('widget').addClass('keyin-dropdown-menu');
 
-        // 직접 입력 시 기존 선택 코드를 지운다.
-        $text.on('input.keyinDropdown', function () {
-            $code.val('');
-            fnSetClearButton();
+        $input.on('input.keyinDropdown', function () {
+            $code.val(''); // 직접 입력 중에는 선택된 코드 무효화
+            setClear();
             if (typeof config.onKeyin === 'function') {
-                config.onKeyin.call(this, $text.val());
+                config.onKeyin.call(this, $input.val());
             }
+        }).on('click.keyinDropdown', function () {
+            $input.autocomplete('search', ''); // 전체 목록 열기
         });
 
-        // 클릭 또는 화살표로 목록을 연다.
-        $text.on('click.keyinDropdown', function () {
-            $text.autocomplete('search', '');
-        });
-        $combo.on('click.keyinDropdown', '.keyin-arrow', function () {
-            var $list = $text.autocomplete('widget');
-            if ($list.is(':visible')) {
-                $text.autocomplete('close');
+        $arrow.on('click.keyinDropdown', function () {
+            var $menu = $input.autocomplete('widget');
+            if ($menu.is(':visible')) {
+                $input.autocomplete('close');
             } else {
-                $text.focus().autocomplete('search', '');
+                $input.focus().autocomplete('search', '');
             }
         });
 
-        // X 클릭 시 표시값과 실제 코드값을 함께 초기화한다.
-        $combo.on('click.keyinDropdown', '.keyin-clear', function () {
-            $text.autocomplete('close').val('');
+        $clear.on('click.keyinDropdown', function () {
+            $input.autocomplete('close').val('');
             $code.val('');
-            fnSetClearButton();
+            setClear();
             if (typeof config.onClear === 'function') {
-                config.onClear.call($text[0]);
+                config.onClear.call($input[0]);
             }
         });
 
-        $text.data('keyinDropdownReady', true);
-        fnSetClearButton();
+        $input.data('keyinDropdownReady', true);
+        setClear();
     });
 };

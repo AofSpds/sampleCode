@@ -2,15 +2,14 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<title>Key-in Dropdown - input 전용 예제</title>
-<!-- 독립 데모용 CDN. 운영 JSP에서는 기존 jQuery/jQuery UI를 사용한다. -->
+<title>Key-in Dropdown - input only</title>
 <link rel="stylesheet" href="https://code.jquery.com/ui/1.10.4/themes/base/jquery-ui.css">
 <link rel="stylesheet" href="keyin-dropdown.css">
 <style>
-    body { margin: 10px; font: 12px Arial, sans-serif; color: #777; }
-    table { border-collapse: collapse; }
-    th, td { border: 1px solid #ddd; padding: 4px 8px; }
-    th { font-weight: normal; background: #f6f6f6; }
+body { margin: 12px; font: 12px Arial, sans-serif; color: #777; }
+table { border-collapse: collapse; }
+th, td { border: 1px solid #ddd; padding: 5px; }
+th { background: #f6f6f6; font-weight: normal; }
 </style>
 </head>
 <body>
@@ -25,17 +24,18 @@
     <tr>
         <th>상태 (AJAX)</th>
         <td colspan="3">
-            <input type="text" id="statusCombo" placeholder="검색 또는 선택"
+            <input type="text" id="statusCombo"
                    style="width:180px;" autocomplete="off">
         </td>
     </tr>
 </table>
+<!-- CDN은 독립 데모용. JSP에는 기존 jQuery/jQuery UI를 중복 로드하지 않는다. -->
 <script src="https://code.jquery.com/jquery-1.9.1.min.js"></script>
 <script src="https://code.jquery.com/ui/1.10.4/jquery-ui.min.js"></script>
 <script src="keyin-dropdown.js"></script>
 <script>
 $(function () {
-    // 고정 옵션
+    // 정적 옵션
     $('#rTypeCombo').keyinDropdown({
         name: 'rTypeCd',
         initialCode: 'ALL',
@@ -46,18 +46,16 @@ $(function () {
             { code: 'B', codeLabel: '시설투자' },
             { code: 'C', codeLabel: '용역' }
         ],
-        onKeyin: function (text) { console.log('직접입력:', text); },
-        onSelect: function (item) { console.log('옵션선택:', item.code, item.codeLabel); },
+        onSelect: function (item) { console.log('선택:', item.code, item.codeLabel); },
+        onKeyin: function (text) { console.log('직접 입력:', text); },
         onClear: function () { console.log('초기화'); }
     });
 
-    // AJAX 옵션 (파일 직접 열기 대신 HTTP 서버에서 테스트)
+    // AJAX 동적 옵션: HTTP 서버에서 mock-options.json 조회
     $('#statusCombo').keyinDropdown({
         name: 'statusCd',
         ajax: { url: 'mock-options.json', type: 'GET' },
-        listWidth: 260,
-        onSelect: function (item) { console.log('AJAX선택:', item.code, item.codeLabel); },
-        onError: function (xhr) { console.log('AJAX오류:', xhr.status); }
+        onError: function (xhr) { console.log('AJAX 오류:', xhr.status); }
     });
 });
 </script>

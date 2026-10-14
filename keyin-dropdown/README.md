@@ -1,19 +1,8 @@
 # Key-in Dropdown
 
-기존 레거시 화면에 사용할 수 있는 **input 전용** jQuery UI Autocomplete 컴포넌트입니다.
-JS는 ES5 스타일(`var`, `function`)이며 jQuery 1.9.1 호환을 기준으로 합니다.
-실제 운영 화면의 jQuery UI 버전은 확인 후 검증해야 합니다.
+jQuery 1.9.1 + jQuery UI Autocomplete 기반의 **input 전용** Key-in Dropdown입니다.
 
-## 파일
-
-- `keyin-dropdown.js`: 단일 입력창을 콤보박스로 만드는 플러그인
-- `keyin-dropdown.css`: 기존 select에 가까운 디자인
-- `demo.html`: 고정 옵션 + AJAX 예시
-- `mock-options.json`: 로컬 AJAX 예제용 JSON
-
-## JSP
-
-**기존 `td` 또는 `colspan`은 그대로 두고 input 하나만 배치합니다.**
+## HTML (JSP)
 
 ```html
 <td colspan="3">
@@ -22,72 +11,90 @@ JS는 ES5 스타일(`var`, `function`)이며 jQuery 1.9.1 호환을 기준으로
 </td>
 ```
 
+- 원본 input을 그대로 사용합니다. **span/wrapper를 생성하거나 지원하지 않습니다.**
+- hidden code 필드, X 버튼, 화살표 버튼만 input 뒤에 형제 요소로 자동 추가합니다.
+- `td`, `colspan`, input `id` 및 `width`는 변경하지 않습니다.
+- 실제 서버 전송용 hidden `name`을 지정하고, 직접 입력 문자열도 서버에 전송할 경우 input에 별도 `name`을 지정합니다.
+
+## 고정 옵션
+
 ```javascript
 $(function () {
     $('#rTypeCombo').keyinDropdown({
-        name: 'rTypeCd',        // 자동 생성되는 hidden 필드명
-        initialCode: 'ALL',    // 최초 선택 코드
-        listWidth: 330,        // 펼친 목록의 최소 폭
+        name: 'rTypeCd',
+        initialCode: 'ALL',
+        listWidth: 330,
         options: [
             { code: 'ALL', codeLabel: '전체' },
             { code: 'A', codeLabel: '자재' },
-            { code: 'B', codeLabel: '시설투자' },
-            { code: 'C', codeLabel: '용역' }
+            { code: 'B', codeLabel: '시설투자' }
         ],
-        onKeyin: function (text) { /* 직접 입력 시 */ },
+        onKeyin: function (text) { /* 직접 입력 */ },
         onSelect: function (item) { /* item.code, item.codeLabel */ },
-        onClear: function () { /* X 초기화 시 */ }
+        onClear: function () { /* X 초기화 */ }
     });
 });
 ```
 
-- `<span class="keyin-dropdown">...</span>`으로 초기화하는 구 방식은 **지원하지 않습니다.** 내부의 span/버튼/hidden은 JS가 자동 생성합니다.
-- 입력창의 `width`가 컴포넌트 폭이 됩니다. 셀 너비까지 채울 필요가 없으면 `width:100%` 대신 픽셀 값을 지정하세요.
-- `options`는 화면의 DOM `<option>` 요소가 아니라 Autocomplete 데이터입니다. 버튼이나 입력창 클릭 시 목록을 확인합니다.
-- 기본 hidden 코드값과 입력창 표시값은 분리됩니다. 직접 입력 시 hidden 값은 비워지고, 선택 시 해당 code가 들어갑니다.
-- 코드값은 `name`으로, 직접 입력 문자열도 서버에 전송해야 한다면 **표시용 input에도 별도의 name**을 지정하세요.
+목록에는 `code + codeLabel`이, 선택된 입력창에는 `codeLabel`만 표시됩니다.
+선택 시 hidden 필드에 code 저장, 직접 입력 시 code 비움, X 클릭 시 둘 다 초기화합니다.
 
-## AJAX
+## AJAX 옵션
 
 ```javascript
-$('#statusCombo').keyinDropdown({
+$('input[id="statusCombo"]:visible').first().keyinDropdown({
     name: 'statusCd',
     ajax: {
-        url: '/your-code-list.do', // 실제 프로젝트 Controller 경로로 교체
+        url: '/code-list.do', // 프로젝트의 실제 Controller 주소로 교체
         type: 'GET',
-        data: function () {
-            return { plant: $('#plant').val() };
-        }
+        data: function () { return { plant: $('#plant').val() }; }
     },
-    onSelect: function (item) {
-        console.log(item.code, item.codeLabel);
-    },
-    onError: function (xhr) {
-        console.log(xhr.status);
-    }
+    onSelect: function (item) { console.log(item.code, item.codeLabel); },
+    onError: function (xhr) { console.log(xhr.status); }
 });
 ```
 
-- API 기본 계약: `[{"code":"10","codeLabel":"견적진행"}, ...]` 최상위 JSON 배열
-- 검색어는 `term` 파라미터로 전송하고 200ms debounce를 적용합니다.
-- `onError`는 선택사항입니다. 실제 URL/응답 구조에 맞춰 변경해야 합니다.
-- 독립 데모의 AJAX를 확인하려면 `python -m http.server 8000`으로 HTTP 서버를 열고 `/demo.html`을 실행하세요.
+기본 응답 계약: `[{"code":"10","codeLabel":"견적진행"}, ...]` JSON 배열.
+서버에는 입력된 검색어를 `term`으로 전달하며 200ms 지연 후 요청합니다.
+실제 API가 객체를 반환한다면 응답 변환이 필요합니다.
 
-## MPS 팝업에서 확인할 항목
+## 동일 ID가 다섯 개인 레거시 화면
 
-팝업 DevTools의 **Sources 화면이 브레이크포인트에서 멈췄다면 F8로 Resume**해야 플러그인 변환 코드가 실행됩니다.
+실제 진단 결과 `rTypeCombo` ID를 가진 input이 **5개** 존재하며, 초기화된 0번은 숨겨져 있고 화면에 노출된 것은 1번입니다.
+`$('#rTypeCombo')`는 첫 input에만 접근하므로 화면의 콤보가 초기화되지 않았습니다.
+
+테이블 렌더링과 복제가 **완료된 뒤** 현재 화면에 표시되는 input을 대상으로 실행하세요.
 
 ```javascript
-typeof $.fn.keyinDropdown                // 'function'
-typeof $.fn.autocomplete                 // 'function' (jQuery UI 로드 확인)
-$('#rTypeCombo').length                  // 1
-$('#rTypeCombo').data('keyinDropdownReady') // 초기화 후 true
-$('#rTypeCombo').parent().attr('class')  // keyin-dropdown
-$('#rTypeCombo').autocomplete('option', 'source') // options면 배열
+$('input[id="rTypeCombo"]:visible').first().keyinDropdown({
+    name: 'rTypeCd',
+    initialCode: 'ALL',
+    options: [
+        { code: 'ALL', codeLabel: '전체' },
+        { code: 'A', codeLabel: '자재' },
+        { code: 'B', codeLabel: '시설투자' }
+    ]
+});
 ```
 
-JS/CSS는 팝업에서 읽히는 위치에 각각 등록해야 합니다. jQuery UI가 없다면 내부 요소를 생성하기 전에 예외가 발생하므로 원래 input이 그대로 남습니다. 실제 JSP에서는 중복 jQuery 로딩을 피하세요.
+여기서 `:visible`은 jQuery가 표시 상태를 판단한 것으로 **뷰포트 안에 실제 노출된다는 뜻은 아닙니다.** 현재 진단에서는 최초 `:visible` 입력이 실제 전면 입력(1번)이므로 사용 가능한 최소 우회책입니다.
+복제 순서가 달라질 수 있다면 `getBoundingClientRect()`와 `elementFromPoint()`로 실제 전면 요소를 선택하거나, 화면별 고유 ID/클래스를 부여하는 것이 바람직합니다.
+`$(function () {})`만으로 table cloning 완료가 보장되는 것은 아니므로, 실제 화면에서 `fixedTable` 등 행 복제·렌더링 이후 초기화하세요.
 
-## 테스트 범위
+## 개발자 도구 점검
 
-GitHub 커밋에는 HTML input만 사용하는 예제와 AJAX 데모를 포함합니다. 로컬 mock 검사와 자바스크립트 구문 검증은 별도이며, 실제 MPS JSP 전체 CSS·스크립트 조합에 대한 브라우저 통합 검증은 필요합니다.
+```javascript
+$('input[id="rTypeCombo"]').length                     // 현행: 5
+$('input[id="rTypeCombo"]:visible').first().data('keyinDropdownReady')
+$('input[id="rTypeCombo"]:visible').first().nextAll('.keyin-arrow').length
+```
+
+정상 초기화라면 첫 번째 표시는 `true`, 두 번째 결과는 `1`이 됩니다.
+CSS와 JS 파일 둘 다 최신 버전으로 교체하고 브라우저를 새로고침하세요. 초기화된 DOM에는 래퍼 span이 없어야 합니다.
+
+## 테스트
+
+- `demo.html`: 고정 옵션, AJAX 옵션 예시 (실제 API 연동 아님)
+- `mock-options.json`: AJAX 예제 데이터
+- 라이브러리 버전: jQuery 1.9.1 확인, jQuery UI 실제 버전 미확인. 데모는 jQuery UI 1.10.4 사용.
+- 실제 팝업 전체 CSS 및 테이블 복제 로직과의 통합 테스트 필요
