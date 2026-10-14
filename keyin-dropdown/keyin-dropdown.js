@@ -19,7 +19,7 @@ $.fn.keyinDropdown = function (settings) {
 
         var config = $.extend({
                 options: [],       // [{ code: 'A', codeLabel: '자재' }]
-                ajax: null,        // { url: '...', type: 'GET', data: {} }
+                ajax: null,        // { url: '...', type: 'GET', data: {}, responseField: 'successList' }
                 listWidth: 260,    // 펼친 옵션 목록의 최소 폭(px)
                 onKeyin: null,     // 직접 입력: function(text) {}
                 onSelect: null,    // 옵션 선택: function(item) {}
@@ -61,8 +61,13 @@ $.fn.keyinDropdown = function (settings) {
                     type: config.ajax.type || 'GET',
                     dataType: 'json',
                     data: $.extend({}, extra, { term: request.term }),
-                    success: function (rows) {
-                        var term = request.term.toLowerCase();
+                    success: function (result) {
+                        // JSON 배열 또는 응답 객체의 지정된 목록 필드 사용
+                        var rows = $.isArray(result) ? result
+                            : (result && config.ajax.responseField
+                                ? result[config.ajax.responseField] : []),
+                            term = request.term.toLowerCase();
+
                         response($.grep(toItems($.isArray(rows) ? rows : []), function (item) {
                             return item.label.toLowerCase().indexOf(term) !== -1;
                         }));

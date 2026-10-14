@@ -48,28 +48,56 @@ function initRTypeCombo() {
 - 반복되는 행에는 중복 ID 대신 `class`를 사용하세요.
 - **초기화된 DOM을 복제하면 X·화살표 버튼도 복제됩니다.** 초기화 전 HTML 템플릿(`#tbSource`)을 사용하세요.
 
-## AJAX로 동적 옵션 조회
+## AJAX로 동적 옵션 조회 (공급업체 / MPS Controller)
 
-DB에서 코드를 가져오는 경우:
+Controller: `/ajax/pr/retrieveVendorByMatCdList.do`
 
 ```javascript
-$('.js-rtype-combo').keyinDropdown({
-    ajax: {
-        url: '/your-code-list.do', // 실제 서버 Controller 경로로 교체
-        type: 'GET',
-        data: function () {
-            return { plant: $('#plant').val() };
+function initVendorCombo() {
+    $('#tbTarget input.js-rtype-combo').filter(function () {
+        return !$(this).data('keyinDropdownReady');
+    }).keyinDropdown({
+        listWidth: 330,
+        ajax: {
+            url: "<c:url value='/ajax/pr/retrieveVendorByMatCdList.do'/>",
+            type: 'GET',
+            responseField: 'successList',
+            data: function () {
+                // #matCd가 화면에서 유일할 때의 예시
+                return { matCd: $('#matCd').val() };
+            }
+        },
+        onSelect: function (item) {
+            console.log(item.code, item.codeLabel);
+        },
+        onError: function (xhr) {
+            console.log('공급업체 조회 실패:', xhr.status);
         }
-    },
-    listWidth: 330,
-    onSelect: function (item) { console.log(item.code); },
-    onError: function (xhr) { console.log(xhr.status); }
-});
+    });
+}
 ```
 
-API 응답은 `[{ "code": "10", "codeLabel": "견적진행" }]` 형태의 JSON 배열이어야 합니다. 검색어는 `term`으로 전달됩니다. 요청 실패 시 `onError`가 실행됩니다. 실제 API가 다른 JSON 형식이면 변환이 필요합니다.
+실제 Controller 응답은 **최상위 JSON 객체**이며, 업체 목록은 `successList`에 들어갑니다.
 
-AJAX 방식에서는 새 행마다 **설정만 초기화**하고, 목록을 검색하거나 열 때 서버 조회합니다. COPY 시 기존 AJAX `source` 함수를 직접 복제하지 마세요.
+```json
+{
+  "successList": [
+    {
+      "VendorWebId": "100002",
+      "VendorName": "(주)엘지상사",
+      "code": "100002",
+      "codeLabel": "(주)엘지상사"
+    }
+  ]
+}
+```
+
+- `responseField: 'successList'`를 사용하면 객체에서 배열을 추출합니다. 기존처럼 **JSON 배열 자체를 반환하는 API도 계속 지원**합니다.
+- `successList`의 개별 항목은 플러그인에서 읽는 `code`, `codeLabel`을 제공해야 합니다. 테스트 Java 메서드가 `VendorWebId`와 `VendorName`만 반환한다면 대응 별칭을 추가해야 합니다.
+- `term`이 검색어로 자동 전달됩니다. 직접 입력 중에는 약 200ms 지연 후 요청하며, 목록을 열 때에도 요청합니다.
+- **TR 그룹마다 자재코드가 다르면** `$('#matCd')`는 올바르지 않을 수 있습니다. `data` 함수의 `this`는 현재 콤보 input이므로, 실제 JSP의 자재코드 위치에 맞게 `$(this)`를 기준으로 찾아야 합니다. 그룹 구조가 확정되지 않았으므로 임의로 검색 경로를 가정하지 않습니다.
+- ADD/COPY에서는 새 input에 이 AJAX 설정을 초기화하고, **실제 업체 목록은 사용자가 검색/목록 열기 시점에 서버 조회**합니다. 기존 AJAX `source` 함수를 복제하지 않습니다.
+- 실패 시 `onError(xhr)`가 호출됩니다. 응답에 지정된 배열이 없으면 목록을 비워 보여줍니다.
 
 ## 이벤트와 값
 
