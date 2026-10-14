@@ -1,6 +1,7 @@
 /**
  * Key-in Dropdown (jQuery + jQuery UI Autocomplete)
  * - input 전용. 부모 span을 생성하거나 테이블 구조를 변경하지 않는다.
+ * - 목록: code + codeLabel / 선택 후 input.value: code
  * - 코드/버튼은 원본 input의 바로 다음 형제 요소로 추가한다.
  */
 $.fn.keyinDropdown = function (settings) {
@@ -33,7 +34,11 @@ $.fn.keyinDropdown = function (settings) {
         // 기존 input의 width/style/id는 그대로 사용한다. span 생성 없음.
         $input.addClass('keyin-dropdown').after($code, $clear, $arrow);
         if (config.name) $code.attr('name', config.name);
-        $code.val(config.initialCode || $input.attr('data-code') || '');
+        // input.value는 항상 code. 복사된 행의 기존 값이 있으면 우선 유지한다.
+        var currentCode = $.trim($input.val() || '') ||
+                          config.initialCode || $input.attr('data-code') || '';
+        $input.val(currentCode);
+        $code.val(currentCode);
 
         function toItems(rows) {
             return $.map(rows || [], function (item) {
@@ -44,7 +49,7 @@ $.fn.keyinDropdown = function (settings) {
                     code: code,
                     codeLabel: label,
                     label: code + '  ' + label, // 목록에 코드 + 명칭 표시
-                    value: label               // 선택 후에는 명칭만 표시
+                    value: code                // 선택 후 input.value에는 코드 저장
                 };
             });
         }
@@ -90,7 +95,7 @@ $.fn.keyinDropdown = function (settings) {
                 );
             },
             select: function (event, ui) {
-                $input.val(ui.item.codeLabel);
+                $input.val(ui.item.code);
                 $code.val(ui.item.code);
                 setClear();
                 if (typeof config.onSelect === 'function') {
@@ -104,7 +109,7 @@ $.fn.keyinDropdown = function (settings) {
         $input.autocomplete('widget').addClass('keyin-dropdown-menu');
 
         $input.on('input.keyinDropdown', function () {
-            $code.val(''); // 직접 입력 중에는 선택된 코드 무효화
+            $code.val($input.val()); // 직접 입력한 코드도 제출 값에 반영
             setClear();
             if (typeof config.onKeyin === 'function') {
                 config.onKeyin.call(this, $input.val());
