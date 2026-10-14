@@ -2,13 +2,14 @@
 input.keyin-dropdown {
     box-sizing: border-box;
     width: 130px;
-    height: 20px;
-    padding: 2px 38px 2px 4px;
+    height: 23px;
+    padding: 1px 38px 1px 4px;
     vertical-align: middle;
     border: 1px solid #d6d6d6;
     background: #fff;
     color: #777;
     font: 12px Arial, sans-serif;
+    line-height: 19px;
 }
 
 /* 입력창 바로 뒤의 버튼을 음수 margin으로 입력창 안에 겹쳐 표시한다.
@@ -18,14 +19,14 @@ button.keyin-arrow {
     position: relative;
     z-index: 1;
     width: 17px;
-    height: 18px;
+    height: 21px;
     padding: 0;
     vertical-align: middle;
     border: 0;
     background: transparent;
     color: #777;
     font: 12px Arial, sans-serif;
-    line-height: 18px;
+    line-height: 19px;
     cursor: pointer;
 }
 button.keyin-clear {
