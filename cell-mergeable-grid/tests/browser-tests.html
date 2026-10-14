@@ -144,17 +144,56 @@
             catch (e) {rejected=true;}
             check(rejected);
         });
-        test("non-contiguous same key1 is not illegally rowspan-merged", function () {
-            grid.setRows([
+        test("non-adjacent key1 rows are grouped visually and rowspan-merged", function () {
+            var source = [
                 {key1:"A",key2:"01",qty:1},
                 {key1:"B",key2:"01",qty:2},
                 {key1:"A",key2:"02",qty:3}
-            ]);
+            ];
+            grid.setRows(source);
             var tr = table.tBodies[0].rows;
-            check(tr[0].cells.length === 5 && tr[2].cells.length === 5);
-            check(tr[0].cells[1].rowSpan === 1 && tr[2].cells[1].rowSpan === 1);
+            check(tr[0].cells.length === 5 && tr[0].cells[1].rowSpan === 2,
+                "first group must merge A/01 + A/02");
+            check(tr[1].cells.length === 4, "second A must omit merged key1 td");
+            check(tr[2].cells.length === 5, "B group must have its own key1 td");
+            var radios = table.querySelectorAll("input[type=radio]");
+            same([radios[0].name, radios[1].name, radios[2].name], ["A","A","B"]);
+            same([radios[0].value, radios[1].value, radios[2].value], ["01","02","01"]);
+            same(grid.getRows(), source, "getRows must keep supplied JSON array order");
             grid.setSelectedKeys([{key1:"A",key2:"02"},{key1:"B",key2:"01"}]);
-            check(grid.getSelectedRows().length === 2);
+            same(grid.getSelectedRows(), [source[1],source[2]], "selected JSON retains original order");
+        });
+        test("interleaved product rows render merged and edit the intended source row", function () {
+            var source = [
+                {key1:"100110",key2:"01",qty:10,status:"대기"},
+                {key1:"100111",key2:"02",qty:20,status:"완료"},
+                {key1:"100112",key2:"01",qty:30,status:"대기"},
+                {key1:"100110",key2:"02",qty:40,status:"완료"}
+            ];
+            grid.setRows(source);
+            var tr = table.tBodies[0].rows;
+            check(tr.length === 4);
+            check(tr[0].cells[1].rowSpan === 2, "100110 must have rowspan 2");
+            check(tr[1].cells.length === 4, "second 100110 row must omit key cell");
+            var radios = table.querySelectorAll("input[type=radio]");
+            same([radios[0].name,radios[1].name,radios[2].name,radios[3].name],
+                ["100110","100110","100111","100112"]);
+            same(grid.getRows(),source,"internal JSON remains in original order");
+            radios[1].checked = true;
+            signalChange(radios[1]);
+            radios[2].checked = true;
+            signalChange(radios[2]);
+            same(grid.getSelectedRows(), [source[1],source[3]]);
+            var editors=table.querySelectorAll('input[type="number"]');
+            editors[1].value="45";
+            signalChange(editors[1]);
+            check(grid.getRows()[3].qty===45, "editing display row 2 must edit original row 4");
+            check(grid.getRows()[1].qty===20, "unrelated original row must remain intact");
+            check(grid.getSelectedRows()[1].qty===45, "edited selection must be reflected");
+            grid.render();
+            check(table.tBodies[0].rows[0].cells[1].rowSpan===2, "rerender must retain merge");
+            check(table.querySelectorAll('input[type="radio"]:checked').length===2,
+                "rerender must retain radio selection");
         });
         test("clearSelection and destroy release markup", function () {
             grid.clearSelection();

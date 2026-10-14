@@ -8,7 +8,7 @@ JSP / jQuery-based legacy screens can use this dependency-free JavaScript compon
 | --- | --- |
 | Data | Each array element is one row object; no nested data wrapper |
 | Identity | key1 + key2; duplicate combinations are rejected |
-| Merge | Only the configured key1 column; **adjacent equal values** share a rowspan |
+| Merge | Only the configured key1 column; identical key1 values are **automatically grouped together for display** and merged with rowspan |
 | Radio | Each individual row has one radio; its HTML name is **String(key1)** by default |
 | Grouping | One selected row per key1 (different key1 groups select independently) |
 | Retention | Selection survives render() and setRows() if the selected composite key remains |
@@ -16,7 +16,7 @@ JSP / jQuery-based legacy screens can use this dependency-free JavaScript compon
 | Editors | Text, number, checkbox, select; edits mutate the internal row object |
 | Styles | No component CSS injected; existing table and CSS classes are reused |
 
-The component **does not sort or rearrange rows**. To merge all records belonging to one key1 into a single cell, supply rows grouped contiguously by key1. Noncontiguous occurrences still belong to the same radio group, but render as separate rowspan runs.
+The component **automatically groups visual rows by key1** (stable first-seen key1 order, then original order within each group). This allows nonadjacent source rows with the same key1 to share one rowspan cell. **The input array and internal row order are not changed:** `getRows()` and `getSelectedRows()` return complete JSON rows in original input order; selection and editor callbacks still reference original row indices.
 
 ## Usage in an existing JSP
 
@@ -87,7 +87,7 @@ Editor changes are committed on the native change event (typically when the cont
 
 | Method | Returns / effect |
 | --- | --- |
-| setRows(jsonArray) | Deep-copies rows, validates composite-key uniqueness, preserves valid selections, rerenders |
+| setRows(jsonArray) | Deep-copies rows, validates composite-key uniqueness, preserves valid selections; groups only display order by key1 |
 | getRows() | JSON array containing all rows and edits |
 | getSelectedRows() | JSON array containing one complete row per selected key1 group |
 | getSelectedKeys() | Array of {key1, key2} key objects using configured field names |
@@ -111,7 +111,7 @@ Key fields must be non-null JSON scalars and should be consistently typed; key c
 
 ## Open and test
 
-- Open demo/index.html in a browser for an interactive example.
+- Open demo/index.html in a browser for an interactive example (the input rows deliberately alternate key1 values to demonstrate automatic display grouping).
 - Open tests/browser-tests.html in a browser; the page reports pass/fail.
 - No npm install, build tooling or jQuery required.
 

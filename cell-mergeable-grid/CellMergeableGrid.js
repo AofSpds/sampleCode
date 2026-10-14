@@ -356,6 +356,41 @@
         return cell;
     };
 
+    // Stable visual grouping: retain original row indices and JSON array ordering.
+    CellMergeableGrid.prototype._displayOrder = function () {
+        var order = [];
+        var hasMerge = false;
+        for (var c = 0; c < this.columns.length; c++) {
+            if (this.columns[c].merge) {
+                hasMerge = true;
+                break;
+            }
+        }
+        if (!hasMerge) {
+            for (var k = 0; k < this._rows.length; k++) {
+                order.push(k);
+            }
+            return order;
+        }
+
+        var positionsByKey = Object.create(null);
+        var groups = [];
+        for (var i = 0; i < this._rows.length; i++) {
+            var key = idForGroup(this._rows[i][this.keyFields[0]]);
+            if (positionsByKey[key] === undefined) {
+                positionsByKey[key] = groups.length;
+                groups.push([]);
+            }
+            groups[positionsByKey[key]].push(i);
+        }
+        for (var g = 0; g < groups.length; g++) {
+            for (var j = 0; j < groups[g].length; j++) {
+                order.push(groups[g][j]);
+            }
+        }
+        return order;
+    };
+
     CellMergeableGrid.prototype.render = function () {
         this._assertAlive();
         var oldSections = this.table.querySelectorAll("thead, tbody");
@@ -375,7 +410,9 @@
         this.table.appendChild(thead);
 
         var tbody = document.createElement("tbody");
-        for (var i = 0; i < this._rows.length; i++) {
+        var displayOrder = this._displayOrder();
+        for (var position = 0; position < displayOrder.length; position++) {
+            var i = displayOrder[position];
             var row = this._rows[i];
             var tr = document.createElement("tr");
             var rowClass = typeof this.options.rowClass === "function" ?
@@ -384,15 +421,16 @@
 
             for (c = 0; c < this.columns.length; c++) {
                 var column = this.columns[c];
-                if (column.merge && i > 0 &&
-                    same(row[this.keyFields[0]], this._rows[i - 1][this.keyFields[0]])) {
+                if (column.merge && position > 0 &&
+                    same(row[this.keyFields[0]], this._rows[displayOrder[position - 1]][this.keyFields[0]])) {
                     continue;
                 }
                 var cell = this._cell(column, i);
                 if (column.merge) {
                     var span = 1;
-                    while (i + span < this._rows.length &&
-                        same(row[this.keyFields[0]], this._rows[i + span][this.keyFields[0]])) {
+                    while (position + span < displayOrder.length &&
+                        same(row[this.keyFields[0]],
+                            this._rows[displayOrder[position + span]][this.keyFields[0]])) {
                         span++;
                     }
                     if (span > 1) {
