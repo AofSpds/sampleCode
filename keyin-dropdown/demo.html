@@ -17,14 +17,14 @@ th { background: #f6f6f6; font-weight: normal; }
     <tr>
         <th>구매요청유형</th>
         <td colspan="3">
-            <input type="text" id="rTypeCombo" value="ALL"
+            <input type="text" id="rTypeCombo" name="rTypeCd" value="ALL"
                    style="width:250px;" autocomplete="off">
         </td>
     </tr>
     <tr>
         <th>상태 (AJAX)</th>
         <td colspan="3">
-            <input type="text" id="statusCombo"
+            <input type="text" id="statusCombo" name="statusCd"
                    style="width:180px;" autocomplete="off">
         </td>
     </tr>
@@ -37,8 +37,6 @@ th { background: #f6f6f6; font-weight: normal; }
 $(function () {
     // 정적 옵션
     $('#rTypeCombo').keyinDropdown({
-        name: 'rTypeCd',
-        initialCode: 'ALL',
         listWidth: 330,
         options: [
             { code: 'ALL', codeLabel: '전체' },
@@ -53,7 +51,6 @@ $(function () {
 
     // AJAX 동적 옵션: HTTP 서버에서 mock-options.json 조회
     $('#statusCombo').keyinDropdown({
-        name: 'statusCd',
         ajax: { url: 'mock-options.json', type: 'GET' },
         onError: function (xhr) { console.log('AJAX 오류:', xhr.status); }
     });

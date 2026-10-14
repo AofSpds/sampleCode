@@ -2,7 +2,8 @@
  * Key-in Dropdown (jQuery + jQuery UI Autocomplete)
  * - input 전용. 부모 span을 생성하거나 테이블 구조를 변경하지 않는다.
  * - 목록: code + codeLabel / 선택 후 input.value: code
- * - 코드/버튼은 원본 input의 바로 다음 형제 요소로 추가한다.
+ * - 기존 input의 name/value를 그대로 사용한다. hidden 필드는 생성하지 않는다.
+ * - X/화살표 버튼은 input의 바로 다음 형제 요소로 추가한다.
  */
 $.fn.keyinDropdown = function (settings) {
     return this.each(function () {
@@ -19,26 +20,17 @@ $.fn.keyinDropdown = function (settings) {
         var config = $.extend({
                 options: [],       // [{ code: 'A', codeLabel: '자재' }]
                 ajax: null,        // { url: '...', type: 'GET', data: {} }
-                name: '',          // hidden 코드의 name
-                initialCode: '',   // 최초 선택된 코드
                 listWidth: 260,    // 펼친 옵션 목록의 최소 폭(px)
                 onKeyin: null,     // 직접 입력: function(text) {}
                 onSelect: null,    // 옵션 선택: function(item) {}
                 onClear: null,     // X 클릭: function() {}
                 onError: null      // AJAX 실패: function(xhr) {}
             }, settings),
-            $code = $('<input type="hidden" class="keyin-code">'),
             $clear = $('<button type="button" class="keyin-clear" aria-label="입력 지우기">×</button>'),
             $arrow = $('<button type="button" class="keyin-arrow" aria-label="옵션 열기"></button>');
 
-        // 기존 input의 width/style/id는 그대로 사용한다. span 생성 없음.
-        $input.addClass('keyin-dropdown').after($code, $clear, $arrow);
-        if (config.name) $code.attr('name', config.name);
-        // input.value는 항상 code. 복사된 행의 기존 값이 있으면 우선 유지한다.
-        var currentCode = $.trim($input.val() || '') ||
-                          config.initialCode || $input.attr('data-code') || '';
-        $input.val(currentCode);
-        $code.val(currentCode);
+        // 원본 input의 name/value/width/id 유지. hidden이나 wrapper 생성 없음.
+        $input.addClass('keyin-dropdown').after($clear, $arrow);
 
         function toItems(rows) {
             return $.map(rows || [], function (item) {
@@ -96,7 +88,6 @@ $.fn.keyinDropdown = function (settings) {
             },
             select: function (event, ui) {
                 $input.val(ui.item.code);
-                $code.val(ui.item.code);
                 setClear();
                 if (typeof config.onSelect === 'function') {
                     config.onSelect.call(this, ui.item);
@@ -109,7 +100,7 @@ $.fn.keyinDropdown = function (settings) {
         $input.autocomplete('widget').addClass('keyin-dropdown-menu');
 
         $input.on('input.keyinDropdown', function () {
-            $code.val($input.val()); // 직접 입력한 코드도 제출 값에 반영
+            // 사용자가 입력한 값이 input.value가 된다.
             setClear();
             if (typeof config.onKeyin === 'function') {
                 config.onKeyin.call(this, $input.val());
@@ -129,7 +120,6 @@ $.fn.keyinDropdown = function (settings) {
 
         $clear.on('click.keyinDropdown', function () {
             $input.autocomplete('close').val('');
-            $code.val('');
             setClear();
             if (typeof config.onClear === 'function') {
                 config.onClear.call($input[0]);
