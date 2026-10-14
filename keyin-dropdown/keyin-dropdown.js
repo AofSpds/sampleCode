@@ -1,134 +1,108 @@
 /**
- * Key-in Dropdown (jQuery + jQuery UI Autocomplete)
- * - 콤보박스마다 독립 초기화 / 별도 전역 상태변수 없음
+ * Key-in Dropdown
+ * jQuery + jQuery UI Autocomplete / input 전용
+ * 사용: $('#rTypeCombo').keyinDropdown({ options: [...], onSelect: function (item) {} });
  */
 $.fn.keyinDropdown = function (settings) {
     return this.each(function () {
-        var $target = $(this),
-            config = $.extend({
-                options: null,       // 고정 옵션. 생략 시 HTML <option> 사용
-                ajax: null,          // 동적 옵션: { url:'...', type:'GET', data:{...} }
-                name: null,          // 자동 생성할 hidden 필드 name
-                initialCode: null,   // 최초 표시값에 대응하는 코드 (선택)
-                listWidth: 260,      // 펼친 목록의 최소 너비(px)
-                onKeyin: null,       // 직접 입력 시 function(text) {}
-                onSelect: null,      // 옵션 선택 시 function(item) {}
-                onClear: null,       // X 버튼 클릭 시 function() {}
-                onError: null        // AJAX 조회 실패 시 function(xhr) {}
-            }, settings),
-            $combo, $text, $code, source;
+        var $text = $(this);
 
         // 같은 입력창을 중복 초기화하지 않는다.
-        if ($target.data('keyinDropdownReady')) return;
+        if ($text.data('keyinDropdownReady')) return;
+        if (!$text.is('input')) {
+            throw new Error('keyinDropdown: input 요소에만 사용할 수 있습니다.');
+        }
         if (typeof $.fn.autocomplete !== 'function') {
-            throw new Error('keyinDropdown: jQuery UI autocomplete가 필요합니다.');
+            throw new Error('keyinDropdown: jQuery UI Autocomplete가 필요합니다.');
         }
 
-        if ($target.is('input')) {
-            // <td><input id="..." style="width:150px"></td> 형태를 지원한다.
-            // 테이블의 셀 크기는 건드리지 않고 컨트롤에만 고정 폭을 적용한다.
-            var width = $target[0].style.width || '130px';
-            $text = $target;
-            $text.wrap('<span class="keyin-dropdown"></span>');
-            $combo = $text.parent().css('width', width);
-            $text.addClass('keyin-text').removeClass('keyin-dropdown');
-            $text[0].style.width = '';
+        var config = $.extend({
+                options: [],        // [{ code:'A', codeLabel:'자재' }]
+                ajax: null,         // { url:'...', type:'GET', data:{...} }
+                name: '',           // 서버로 전달할 hidden code 필드명
+                initialCode: '',    // 최초 선택된 코드 (선택)
+                listWidth: 260,     // 펼친 옵션 목록의 최소 폭(px)
+                onKeyin: null,      // 직접 입력 이벤트 function(text) {}
+                onSelect: null,     // 옵션 선택 이벤트 function(item) {}
+                onClear: null,      // X 초기화 이벤트 function() {}
+                onError: null       // AJAX 오류 이벤트 function(xhr) {}
+            }, settings),
+            width = $text.outerWidth();
 
-            // 표시값과 코드값을 분리하여 기존 JSP 전송 구조를 유지한다.
+        // JSP에는 input만 배치하고, 콤보 구성 요소는 여기에서 만든다.
+        $text.wrap('<span class="keyin-dropdown"></span>');
+        var $combo = $text.parent().outerWidth(width),
             $code = $('<input type="hidden" class="keyin-code">').appendTo($combo);
-            $combo.append(
-                '<button type="button" class="keyin-clear" aria-label="입력 지우기">×</button>' +
-                '<button type="button" class="keyin-arrow" aria-label="옵션 열기"></button>'
-            );
-            if (config.initialCode !== null) {
-                $code.val(config.initialCode);
-            } else if ($text.attr('data-code') !== undefined) {
-                $code.val($text.attr('data-code'));
-            }
-        } else {
-            // 이전의 <span class="keyin-dropdown"> 구조도 그대로 지원한다.
-            $combo = $target;
-            $text = $combo.find('.keyin-text');
-            $code = $combo.find('.keyin-code');
-        }
 
-        if (!$text.length || !$code.length) {
-            throw new Error('keyinDropdown: 입력창 또는 코드 필드가 없습니다.');
-        }
-        if (config.name && !$code.attr('name')) {
-            $code.attr('name', config.name);
-        }
-        source = config.options != null ? config.options : $combo.find('.keyin-options option').get();
+        $text.addClass('keyin-text').removeClass('keyin-dropdown');
+        $text[0].style.width = ''; // 기존 input의 인라인 width를 wrapper로 이전
 
-        // 배열, HTML option, AJAX 응답을 공통 옵션 형식으로 변환한다.
+        if (config.name) $code.attr('name', config.name);
+        $code.val(config.initialCode || $text.attr('data-code') || '');
+        $combo.append(
+            '<button type="button" class="keyin-clear" aria-label="입력 지우기">×</button>' +
+            '<button type="button" class="keyin-arrow" aria-label="옵션 열기"></button>'
+        );
+
+        // 코드 목록을 Autocomplete의 {label, value} 형식으로 변환한다.
         function fnToItems(rows) {
-            return $.map(rows, function (option) {
-                var code = option.nodeType ? option.value : option.code,
-                    codeLabel = option.nodeType ? $(option).text() : option.codeLabel;
-
-                code = code == null ? '' : String(code);
-                codeLabel = codeLabel == null ? '' : String(codeLabel);
+            return $.map(rows || [], function (item) {
+                var code = item.code == null ? '' : String(item.code),
+                    codeLabel = item.codeLabel == null ? '' : String(item.codeLabel);
 
                 return {
                     code: code,
                     codeLabel: codeLabel,
-                    value: codeLabel,                 // 선택 후 입력창: codeLabel
-                    label: code + '  ' + codeLabel    // 펼친 목록: code + codeLabel
+                    label: code + '  ' + codeLabel, // 목록 표시값
+                    value: codeLabel               // 선택 후 입력창 표시값
                 };
             });
         }
 
-        var items = fnToItems(source);
-
-        // 입력값이 있을 때만 X 버튼을 표시한다.
+        // 입력값이 존재할 때만 X 버튼을 표시한다.
         function fnSetClearButton() {
             $combo.toggleClass('has-value', $.trim($text.val() || '') !== '');
         }
 
-        // 목록 필터링 / 방향키 / Enter / ESC는 jQuery UI에서 처리한다.
+        // 고정 options 또는 AJAX 조회 결과를 목록에 표시한다.
         $text.autocomplete({
-            // ajax 설정 시 입력할 때마다 서버 조회. 없으면 기존 고정 옵션을 사용한다.
             source: config.ajax && config.ajax.url ? function (request, response) {
-                var extra = typeof config.ajax.data === 'function'
-                    ? config.ajax.data.call($combo[0]) : config.ajax.data;
+                var params = typeof config.ajax.data === 'function'
+                    ? config.ajax.data.call($text[0]) : config.ajax.data;
 
                 $.ajax({
                     url: config.ajax.url,
                     type: config.ajax.type || 'GET',
                     dataType: 'json',
-                    data: $.extend({}, extra, { term: request.term }),
+                    data: $.extend({}, params, { term: request.term }),
                     success: function (rows) {
-                        // 응답 형식: [{code:'10', codeLabel:'견적진행'}, ...]
-                        // 테스트용 JSON이 전체 목록을 반환해도 검색어로 필터링한다.
-                        var list = fnToItems($.isArray(rows) ? rows : []),
+                        var items = fnToItems($.isArray(rows) ? rows : []),
                             term = request.term.toLowerCase();
 
-                        response($.grep(list, function (item) {
+                        response($.grep(items, function (item) {
                             return item.label.toLowerCase().indexOf(term) !== -1;
                         }));
                     },
                     error: function (xhr) {
-                        response([]); // 반드시 완료 콜백을 호출하여 로딩 상태를 해제한다.
+                        response([]);
                         if (typeof config.onError === 'function') {
                             config.onError.call($text[0], xhr);
                         }
                     }
                 });
-            } : items,
+            } : fnToItems(config.options),
             minLength: 0,
             delay: config.ajax && config.ajax.url ? 200 : 0,
             appendTo: 'body',
             focus: function () {
-                return false; // 목록에서 이동할 때는 입력값을 바꾸지 않는다.
+                return false; // 키보드 이동 중 입력창 값을 변경하지 않는다.
             },
             open: function () {
-                // 기존 화면의 검색영역의 overflow가 목록을 자르지 않도록 body에 표시한다.
                 $text.autocomplete('widget').outerWidth(
                     Math.max(config.listWidth, $combo.outerWidth())
                 );
             },
             select: function (event, ui) {
-                // 옵션 선택: 화면에는 명칭, 서버 제출용 hidden에는 코드.
                 $text.val(ui.item.codeLabel);
                 $code.val(ui.item.code);
                 fnSetClearButton();
@@ -140,40 +114,24 @@ $.fn.keyinDropdown = function (settings) {
             }
         });
 
-        // 메뉴 위치 계산 이전부터 목록 CSS가 적용되도록 생성 직후 클래스 지정.
-        // jQuery UI 테마 CSS가 누락되어도 목록 위치와 크기가 유지된다.
+        // 메뉴가 열리기 전부터 CSS가 적용되도록 클래스를 지정한다.
         $text.autocomplete('widget').addClass('keyin-dropdown-menu');
 
-        // 다른 콤보로 이동하면 기존에 열려 있던 목록을 닫는다.
-        $text.on('focus.keyinDropdown', function () {
-            $('.keyin-dropdown').not($combo).each(function () {
-                var $other = $(this);
-
-                if ($other.data('keyinDropdownReady')) {
-                    $other.find('.keyin-text').autocomplete('close');
-                }
-            });
-        });
-
-        // 직접 입력: 선택된 코드 초기화 및 onKeyin 호출.
+        // 직접 입력 시 기존 선택 코드를 지운다.
         $text.on('input.keyinDropdown', function () {
             $code.val('');
             fnSetClearButton();
-
             if (typeof config.onKeyin === 'function') {
                 config.onKeyin.call(this, $text.val());
             }
         });
 
-        // 입력창을 클릭하면 조건 없이 전체 옵션을 보여준다.
+        // 클릭 또는 화살표로 목록을 연다.
         $text.on('click.keyinDropdown', function () {
             $text.autocomplete('search', '');
         });
-
-        // 화살표를 누르면 목록을 열거나 닫는다.
         $combo.on('click.keyinDropdown', '.keyin-arrow', function () {
             var $list = $text.autocomplete('widget');
-
             if ($list.is(':visible')) {
                 $text.autocomplete('close');
             } else {
@@ -181,18 +139,16 @@ $.fn.keyinDropdown = function (settings) {
             }
         });
 
-        // X 클릭: text, code를 비우고 onClear만 호출한다.
+        // X 클릭 시 표시값과 실제 코드값을 함께 초기화한다.
         $combo.on('click.keyinDropdown', '.keyin-clear', function () {
             $text.autocomplete('close').val('');
             $code.val('');
             fnSetClearButton();
-
             if (typeof config.onClear === 'function') {
                 config.onClear.call($text[0]);
             }
         });
 
-        $combo.data('keyinDropdownReady', true);
         $text.data('keyinDropdownReady', true);
         fnSetClearButton();
     });

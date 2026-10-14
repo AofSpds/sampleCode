@@ -2,106 +2,62 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<title>Key-in Dropdown - 레거시 스타일 예제</title>
-<!-- 독립 데모: 확인된 jQuery 1.9.1 및 jQuery UI 1.10.4(데모용, 운영 UI 버전 미확인). -->
-<!-- 실제 JSP에서는 이미 로드된 jQuery / jQuery UI를 재사용하고 중복 로드하지 않는다. -->
+<title>Key-in Dropdown - input 전용 예제</title>
+<!-- 독립 데모용 CDN. 운영 JSP에서는 기존 jQuery/jQuery UI를 사용한다. -->
 <link rel="stylesheet" href="https://code.jquery.com/ui/1.10.4/themes/base/jquery-ui.css">
 <link rel="stylesheet" href="keyin-dropdown.css">
 <style>
     body { margin: 10px; font: 12px Arial, sans-serif; color: #777; }
-    .terms { display: inline-block; margin-right: 18px; }
-    .terms .txt { display: inline-block; margin-right: 7px; }
+    table { border-collapse: collapse; }
+    th, td { border: 1px solid #ddd; padding: 4px 8px; }
+    th { font-weight: normal; background: #f6f6f6; }
 </style>
 </head>
 <body>
-<div class="search_area">
-    <!-- JSP td 안에는 input 하나만 배치. 콤보 내부 요소는 JS가 생성한다. -->
-    <table style="table-layout:fixed; border-collapse:collapse; width:420px;">
-        <tr>
-            <th style="width:95px;">구매요청유형</th>
-            <td colspan="3" style="border:1px solid #ddd; padding:4px;">
-                <input type="text" id="rTypeCombo" style="width:150px"
-                       value="전체" aria-label="구매요청유형" autocomplete="off">
-            </td>
-        </tr>
-    </table>
-
-    <!-- 기존 select/option으로 옵션을 지정하는 예제 -->
-    <span class="terms">
-        <span class="txt">상태</span>
-        <span id="statusCombo" class="keyin-dropdown">
-            <input type="text" class="keyin-text" value="견적진행" aria-label="상태" autocomplete="off">
-            <input type="hidden" class="keyin-code" name="statusCd" value="10">
-            <button type="button" class="keyin-clear" aria-label="입력 지우기">×</button>
-            <button type="button" class="keyin-arrow" aria-label="옵션 열기"></button>
-            <select class="keyin-options" style="display:none" tabindex="-1" aria-hidden="true">
-                <option value="00">전체</option>
-                <option value="10">견적진행</option>
-                <option value="20">견적마감</option>
-                <option value="30">견적취소</option>
-            </select>
-        </span>
-    </span>
-
-    <!-- AJAX에서 JSON 배열을 읽는 예제. HTTP로 실행해야 한다. -->
-    <span class="terms">
-        <span class="txt">동적옵션</span>
-        <span id="ajaxCombo" class="keyin-dropdown" style="width:160px">
-            <input type="text" class="keyin-text" placeholder="검색하거나 선택" aria-label="동적옵션" autocomplete="off">
-            <input type="hidden" class="keyin-code" name="ajaxCode">
-            <button type="button" class="keyin-clear" aria-label="입력 지우기">×</button>
-            <button type="button" class="keyin-arrow" aria-label="옵션 열기"></button>
-        </span>
-    </span>
-</div>
-
+<table>
+    <tr>
+        <th>구매요청유형</th>
+        <td colspan="3">
+            <input type="text" id="rTypeCombo" value="전체"
+                   style="width:250px;" autocomplete="off">
+        </td>
+    </tr>
+    <tr>
+        <th>상태 (AJAX)</th>
+        <td colspan="3">
+            <input type="text" id="statusCombo" placeholder="검색 또는 선택"
+                   style="width:180px;" autocomplete="off">
+        </td>
+    </tr>
+</table>
 <script src="https://code.jquery.com/jquery-1.9.1.min.js"></script>
 <script src="https://code.jquery.com/ui/1.10.4/jquery-ui.min.js"></script>
 <script src="keyin-dropdown.js"></script>
 <script>
 $(function () {
-    // 1. 옵션 및 이벤트 설정
+    // 고정 옵션
     $('#rTypeCombo').keyinDropdown({
         name: 'rTypeCd',
         initialCode: 'ALL',
+        listWidth: 330,
         options: [
             { code: 'ALL', codeLabel: '전체' },
             { code: 'A', codeLabel: '자재' },
             { code: 'B', codeLabel: '시설투자' },
-            { code: 'C', codeLabel: '용역' },
-            { code: 'D', codeLabel: '장기 설비 유지보수 / 계약 견적 검토' }
+            { code: 'C', codeLabel: '용역' }
         ],
-        listWidth: 330,
-        onKeyin: function (text) {
-            console.log('직접 입력:', text);
-        },
-        onSelect: function (item) {
-            console.log('옵션 선택:', item.code, item.codeLabel);
-        },
-        onClear: function () {
-            console.log('초기화');
-        }
+        onKeyin: function (text) { console.log('직접입력:', text); },
+        onSelect: function (item) { console.log('옵션선택:', item.code, item.codeLabel); },
+        onClear: function () { console.log('초기화'); }
     });
 
-    // 2. 기존 HTML <option> 읽기
-    $('#statusCombo').keyinDropdown({ listWidth: 220 });
-
-    // 3. AJAX 동적 옵션 (로컬 HTTP 서버에서 mock-options.json 사용)
-    $('#ajaxCombo').keyinDropdown({
+    // AJAX 옵션 (파일 직접 열기 대신 HTTP 서버에서 테스트)
+    $('#statusCombo').keyinDropdown({
+        name: 'statusCd',
         ajax: { url: 'mock-options.json', type: 'GET' },
-        listWidth: 280,
-        onSelect: function (item) {
-            console.log('AJAX 옵션 선택:', item.code, item.codeLabel);
-        },
-        onKeyin: function (text) {
-            console.log('AJAX 직접 입력:', text);
-        },
-        onClear: function () {
-            console.log('AJAX 초기화');
-        },
-        onError: function (xhr) {
-            console.warn('AJAX 조회 실패:', xhr.status);
-        }
+        listWidth: 260,
+        onSelect: function (item) { console.log('AJAX선택:', item.code, item.codeLabel); },
+        onError: function (xhr) { console.log('AJAX오류:', xhr.status); }
     });
 });
 </script>
