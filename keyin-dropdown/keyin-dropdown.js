@@ -1,9 +1,9 @@
 /**
- * Key-in Dropdown (jQuery + jQuery UI Autocomplete)
- * - input 전용. 부모 span을 생성하거나 테이블 구조를 변경하지 않는다.
- * - 목록: code + codeLabel / 선택 후 input.value: code
- * - 기존 input의 name/value를 그대로 사용한다. hidden 필드는 생성하지 않는다.
- * - X/화살표 버튼은 input의 바로 다음 형제 요소로 추가한다.
+ * Key-in Dropdown (jQuery 1.9.1 + jQuery UI Autocomplete)
+ * - 부모 wrapper 없이 기존 input에 적용한다.
+ * - displayMode 'code'(기본): 기존 input의 name/value가 코드이며 hidden을 만들지 않는다.
+ * - 다른 displayMode: 기존 input은 표시용, 동일 name을 가진 hidden input은 전송용 코드다.
+ * - X/화살표 버튼은 표시 input의 바로 다음 형제 요소다.
  */
 $.fn.keyinDropdown = function (settings) {
     return this.each(function () {
@@ -18,73 +18,130 @@ $.fn.keyinDropdown = function (settings) {
         }
 
         var config = $.extend({
-                options: [],       // [{ code: 'A', codeLabel: '자재' }]
-                ajax: null,        // { url: '...', type: 'GET', data: {}, responseField: 'successList' }
-                listWidth: 260,    // 펼친 옵션 목록의 최소 폭(px)
-                onKeyin: null,     // 직접 입력: function(text) {}
-                onSelect: null,    // 옵션 선택: function(item) {}
-                onClear: null,     // X 클릭: function() {}
-                onError: null      // AJAX 실패: function(xhr) {}
+                options: [],       // [{ code: '100002', codeLabel: '(주)엘지상사' }]
+                ajax: null,        // { url, type, data, responseField: 'successList' }
+                displayMode: 'code', // code / codeLabel / both / custom
+                displayFormat: null, // custom: function(item) { return ...; }
+                listWidth: 260,
+                onKeyin: null,
+                onSelect: null,
+                onClear: null,
+                onError: null
             }, settings),
+            separateCode = config.displayMode !== 'code',
+            initialCode = String($input.val() == null ? '' : $input.val()),
+            initialCodeLabel = $input.attr('data-code-label'),
+            $codeInput = null,
             $clear = $('<button type="button" class="keyin-clear" aria-label="입력 지우기">×</button>'),
             $arrow = $('<button type="button" class="keyin-arrow" aria-label="옵션 열기"></button>');
 
-        // 원본 input의 name/value/width/id 유지. hidden이나 wrapper 생성 없음.
-        $input.addClass('keyin-dropdown').after($clear, $arrow);
+        if ($.inArray(config.displayMode, ['code', 'codeLabel', 'both', 'custom']) === -1) {
+            throw new Error('keyinDropdown: 알 수 없는 displayMode입니다.');
+        }
+        if (config.displayMode === 'custom' && typeof config.displayFormat !== 'function') {
+            throw new Error('keyinDropdown: custom에는 displayFormat 함수가 필요합니다.');
+        }
+        if (separateCode && !$input.attr('name')) {
+            throw new Error('keyinDropdown: code 이외 모드에서는 원본 input의 name이 필요합니다.');
+        }
+
+        if (separateCode) {
+            // 기존 name은 전송용 hidden으로 이동한다. 화면 input은 serializeArray에서 제외된다.
+            $codeInput = $('<input type="hidden" class="keyin-code">')
+                .attr('name', $input.attr('name'))
+                .val(initialCode);
+            $input.removeAttr('name');
+            $input.data('keyinDropdownCodeInput', $codeInput);
+        }
+
+        $input.addClass('keyin-dropdown');
+        if ($codeInput) {
+            $input.after($clear, $arrow, $codeInput);
+        } else {
+            $input.after($clear, $arrow);
+        }
 
         function toItems(rows) {
             return $.map(rows || [], function (item) {
                 var code = item.code == null ? '' : String(item.code),
-                    label = item.codeLabel == null ? '' : String(item.codeLabel);
+                    codeLabel = item.codeLabel == null ? '' : String(item.codeLabel);
 
-                return {
+                // 추가 응답 필드도 custom 표시 및 onSelect에서 사용 가능
+                return $.extend({}, item, {
                     code: code,
-                    codeLabel: label,
-                    label: code + '  ' + label, // 목록에 코드 + 명칭 표시
-                    value: code                // 선택 후 input.value에는 코드 저장
-                };
+                    codeLabel: codeLabel,
+                    label: code + '  ' + codeLabel,
+                    value: code
+                });
             });
         }
 
-        // 값이 있을 때만 X 버튼 표시. 별도 상태변수는 사용하지 않는다.
+        function displayText(item) {
+            if (config.displayMode === 'codeLabel') return item.codeLabel;
+            if (config.displayMode === 'both') {
+                return item.code + (item.codeLabel ? ' ' + item.codeLabel : '');
+            }
+            if (config.displayMode === 'custom') {
+                var text = config.displayFormat.call($input[0], item);
+                return text == null ? '' : String(text);
+            }
+            return item.code;
+        }
+
         function setClear() {
-            $clear.toggleClass('is-visible', $.trim($input.val() || '') !== '');
+            var hasValue = $.trim($input.val() || '') !== ''
+                || ($codeInput && $.trim($codeInput.val() || '') !== '');
+            $clear.toggleClass('is-visible', !!hasValue);
+        }
+
+        function setSelected(item) {
+            $input.val(displayText(item));
+            if ($codeInput) $codeInput.val(item.code);
+            $input.data('keyinDropdownSelected', item);
+            setClear();
+        }
+
+        function loadRows(term, onSuccess, onFailure) {
+            var extra = typeof config.ajax.data === 'function'
+                ? config.ajax.data.call($input[0]) : config.ajax.data;
+
+            $.ajax({
+                url: config.ajax.url,
+                type: config.ajax.type || 'GET',
+                dataType: 'json',
+                data: $.extend({}, extra, { term: term }),
+                success: function (result) {
+                    var rows = $.isArray(result) ? result
+                        : (result && config.ajax.responseField
+                            ? result[config.ajax.responseField] : []);
+                    onSuccess($.isArray(rows) ? rows : []);
+                },
+                error: function (xhr) {
+                    if (typeof onFailure === 'function') onFailure(xhr);
+                    if (typeof config.onError === 'function') {
+                        config.onError.call($input[0], xhr);
+                    }
+                }
+            });
         }
 
         $input.autocomplete({
             source: config.ajax && config.ajax.url ? function (request, response) {
-                var extra = typeof config.ajax.data === 'function'
-                    ? config.ajax.data.call($input[0]) : config.ajax.data;
+                var term = request.term.toLowerCase();
 
-                $.ajax({
-                    url: config.ajax.url,
-                    type: config.ajax.type || 'GET',
-                    dataType: 'json',
-                    data: $.extend({}, extra, { term: request.term }),
-                    success: function (result) {
-                        // JSON 배열 또는 응답 객체의 지정된 목록 필드 사용
-                        var rows = $.isArray(result) ? result
-                            : (result && config.ajax.responseField
-                                ? result[config.ajax.responseField] : []),
-                            term = request.term.toLowerCase();
-
-                        response($.grep(toItems($.isArray(rows) ? rows : []), function (item) {
-                            return item.label.toLowerCase().indexOf(term) !== -1;
-                        }));
-                    },
-                    error: function (xhr) {
-                        response([]);
-                        if (typeof config.onError === 'function') {
-                            config.onError.call($input[0], xhr);
-                        }
-                    }
+                loadRows(request.term, function (rows) {
+                    response($.grep(toItems(rows), function (item) {
+                        return item.label.toLowerCase().indexOf(term) !== -1;
+                    }));
+                }, function () {
+                    response([]);
                 });
             } : toItems(config.options),
             minLength: 0,
             delay: config.ajax && config.ajax.url ? 200 : 0,
-            appendTo: 'body', // td의 overflow에 목록이 잘리지 않게 한다.
+            appendTo: 'body',
             focus: function () {
-                return false; // 키보드 이동 중 입력값 변경 방지
+                return false; // 키보드 이동 중 표시값 변경 방지
             },
             open: function () {
                 $input.autocomplete('widget').outerWidth(
@@ -92,8 +149,7 @@ $.fn.keyinDropdown = function (settings) {
                 );
             },
             select: function (event, ui) {
-                $input.val(ui.item.code);
-                setClear();
+                setSelected(ui.item);
                 if (typeof config.onSelect === 'function') {
                     config.onSelect.call(this, ui.item);
                 }
@@ -101,17 +157,18 @@ $.fn.keyinDropdown = function (settings) {
             }
         });
 
-        // 최초 목록 오픈 전에 메뉴 전용 CSS 클래스 설정
         $input.autocomplete('widget').addClass('keyin-dropdown-menu');
 
         $input.on('input.keyinDropdown', function () {
-            // 사용자가 입력한 값이 input.value가 된다.
+            // 다른 표시 모드에서는 목록 선택 전까지 서버 코드값을 비운다.
+            if ($codeInput) $codeInput.val('');
+            $input.removeData('keyinDropdownSelected');
             setClear();
             if (typeof config.onKeyin === 'function') {
                 config.onKeyin.call(this, $input.val());
             }
         }).on('click.keyinDropdown', function () {
-            $input.autocomplete('search', ''); // 전체 목록 열기
+            $input.autocomplete('search', '');
         });
 
         $arrow.on('click.keyinDropdown', function () {
@@ -125,6 +182,8 @@ $.fn.keyinDropdown = function (settings) {
 
         $clear.on('click.keyinDropdown', function () {
             $input.autocomplete('close').val('');
+            if ($codeInput) $codeInput.val('');
+            $input.removeData('keyinDropdownSelected');
             setClear();
             if (typeof config.onClear === 'function') {
                 config.onClear.call($input[0]);
@@ -132,6 +191,35 @@ $.fn.keyinDropdown = function (settings) {
         });
 
         $input.data('keyinDropdownReady', true);
+
+        // 최초 JSP input.value에는 반드시 코드가 들어 있어야 한다.
+        // 정적 옵션/서버 렌더링된 명칭이 있으면 즉시 표시한다.
+        if (separateCode && initialCode !== '') {
+            var matching = $.grep(toItems(config.options), function (item) {
+                return item.code === initialCode;
+            })[0];
+
+            if (!matching && initialCodeLabel != null && initialCodeLabel !== '') {
+                matching = { code: initialCode, codeLabel: initialCodeLabel };
+            }
+
+            if (matching) {
+                setSelected(matching);
+            } else if (config.ajax && config.ajax.url) {
+                // 기존 코드만 있는 JSP 행은 비동기로 업체명을 조회하여 표시한다.
+                // 조회 중 사용자가 수정/선택/삭제했다면 과거 응답으로 덮어쓰지 않는다.
+                loadRows('', function (rows) {
+                    if ($codeInput.val() !== initialCode ||
+                        $input.data('keyinDropdownSelected')) return;
+
+                    var item = $.grep(toItems(rows), function (row) {
+                        return row.code === initialCode;
+                    })[0];
+                    if (item) setSelected(item);
+                });
+            }
+        }
+
         setClear();
     });
 };

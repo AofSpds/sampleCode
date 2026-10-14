@@ -1,4 +1,7 @@
 /* 기존 input은 그대로 사용: 부모 wrapper/span 생성 없음. */
+/* code 이외 displayMode에서 전송 코드 전용 hidden */
+input.keyin-code { display: none !important; }
+
 input.keyin-dropdown {
     box-sizing: border-box;
     width: 130px;

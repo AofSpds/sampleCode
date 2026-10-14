@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<title>Key-in Dropdown - input only</title>
+<title>Key-in Dropdown - displayMode</title>
 <link rel="stylesheet" href="https://code.jquery.com/ui/1.10.4/themes/base/jquery-ui.css">
 <link rel="stylesheet" href="keyin-dropdown.css">
 <style>
@@ -13,6 +13,7 @@ th { background: #f6f6f6; font-weight: normal; }
 </style>
 </head>
 <body>
+<form id="demoForm">
 <table>
     <tr>
         <th>구매요청유형</th>
@@ -22,13 +23,37 @@ th { background: #f6f6f6; font-weight: normal; }
         </td>
     </tr>
     <tr>
-        <th>상태 (AJAX)</th>
+        <th>업체명만 표시 (codeLabel)</th>
         <td colspan="3">
-            <input type="text" id="statusCombo" name="statusCd"
-                   style="width:180px;" autocomplete="off">
+            <input type="text" id="vendorLabelCombo" name="vendorWebId" value="100002"
+                   style="width:250px;" autocomplete="off">
+        </td>
+    </tr>
+    <tr>
+        <th>코드 + 업체명 (both)</th>
+        <td colspan="3">
+            <input type="text" id="vendorBothCombo" name="vendorBothId" value="100006"
+                   style="width:250px;" autocomplete="off">
+        </td>
+    </tr>
+    <tr>
+        <th>사용자 지정 (custom)</th>
+        <td colspan="3">
+            <input type="text" id="vendorCustomCombo" name="vendorCustomId" value="100002"
+                   style="width:250px;" autocomplete="off">
+        </td>
+    </tr>
+    <tr>
+        <th>업체명 (AJAX)</th>
+        <td colspan="3">
+            <input type="text" id="statusCombo" name="statusCd" value="10"
+                   style="width:250px;" autocomplete="off">
         </td>
     </tr>
 </table>
+<button type="button" id="showFormValues">서버 전송값 확인</button>
+<pre id="formValues"></pre>
+</form>
 <!-- CDN은 독립 데모용. JSP에는 기존 jQuery/jQuery UI를 중복 로드하지 않는다. -->
 <script src="https://code.jquery.com/jquery-1.9.1.min.js"></script>
 <script src="https://code.jquery.com/ui/1.10.4/jquery-ui.min.js"></script>
@@ -49,10 +74,37 @@ $(function () {
         onClear: function () { console.log('초기화'); }
     });
 
+    var vendorOptions = [
+        { code: '100002', codeLabel: '(주)엘지상사' },
+        { code: '100006', codeLabel: '(주)홍보실업' },
+        { code: '100008', codeLabel: '무림피앤피(주)' }
+    ];
+
+    $('#vendorLabelCombo').keyinDropdown({
+        displayMode: 'codeLabel',
+        options: vendorOptions
+    });
+    $('#vendorBothCombo').keyinDropdown({
+        displayMode: 'both',
+        options: vendorOptions
+    });
+    $('#vendorCustomCombo').keyinDropdown({
+        displayMode: 'custom',
+        displayFormat: function (item) {
+            return item.codeLabel + ' [' + item.code + ']';
+        },
+        options: vendorOptions
+    });
+
     // AJAX 동적 옵션: HTTP 서버에서 mock-options.json 조회
     $('#statusCombo').keyinDropdown({
+        displayMode: 'codeLabel',
         ajax: { url: 'mock-options.json', type: 'GET' },
         onError: function (xhr) { console.log('AJAX 오류:', xhr.status); }
+    });
+
+    $('#showFormValues').on('click', function () {
+        $('#formValues').text(JSON.stringify($('#demoForm').serializeArray(), null, 2));
     });
 });
 </script>
