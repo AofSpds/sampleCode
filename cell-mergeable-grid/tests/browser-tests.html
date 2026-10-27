@@ -195,6 +195,142 @@
             check(table.querySelectorAll('input[type="radio"]:checked').length===2,
                 "rerender must retain radio selection");
         });
+        // Three-part row identity: two group fields + one supplier field.
+        var tripleTable = document.createElement("table");
+        var tripleRows = [
+            {itemCd:"10",matCd:"100510",VendorWebId:"100002",vendorName:"Alpha",qty:10,bizRegNo:"111"},
+            {itemCd:"20",matCd:"200110",VendorWebId:"100002",vendorName:"Alpha",qty:20,bizRegNo:"111"},
+            {itemCd:"10",matCd:"100510",VendorWebId:"100006",vendorName:"Beta",qty:30,bizRegNo:"222"},
+            {itemCd:"10",matCd:"999999",VendorWebId:"100008",vendorName:"Gamma",qty:40,bizRegNo:"333"},
+            {itemCd:"20",matCd:"200110",VendorWebId:"100010",vendorName:"Delta",qty:50,bizRegNo:"444"},
+            {itemCd:"10",matCd:"999999",VendorWebId:"100009",vendorName:"Epsilon",qty:60,bizRegNo:"555"}
+        ];
+        var editContexts = [];
+        var selectContexts = [];
+        var triple = new CellMergeableGrid(tripleTable, {
+            keyFields:["itemCd","matCd","VendorWebId"],
+            columns:[
+                {type:"radio",title:"선택"},
+                {field:"itemCd",title:"품목",merge:true},
+                {field:"matCd",title:"자재코드",merge:true},
+                {field:"VendorWebId",title:"업체코드"},
+                {field:"vendorName",title:"업체명"},
+                {field:"qty",title:"수량",editor:"number",onChange:function(v,r,ctx){editContexts.push(ctx);}}
+            ],
+            onSelect:function(r,ctx){selectContexts.push(ctx);}
+        });
+        test("3-key config merges both itemCd and matCd by their pair", function () {
+            triple.setRows(tripleRows);
+            var tr=tripleTable.tBodies[0].rows;
+            check(tr.length===6,"six supplier rows expected");
+            check(tr[0].cells.length===6 && tr[0].cells[1].rowSpan===2 &&
+                tr[0].cells[2].rowSpan===2,"first pair must merge both group cells");
+            check(tr[1].cells.length===4,"second supplier needs radio, vendor, name, qty only");
+            check(tr[2].cells.length===6 && tr[2].cells[1].rowSpan===2 &&
+                tr[2].cells[2].rowSpan===2,"second pair must merge both group cells");
+            check(tr[4].cells.length===6 && tr[4].cells[1].rowSpan===2 &&
+                tr[4].cells[2].rowSpan===2,"same item but different material must start new group");
+            same(triple.getRows(),tripleRows,"getRows retains original interleaved order");
+        });
+        test("3-key radio name includes both group keys, value is VendorWebId", function () {
+            var radios=tripleTable.querySelectorAll("input[type=radio]");
+            same(radios.map(function(r){return r.name;}),[
+                '["10","100510"]','["10","100510"]',
+                '["20","200110"]','["20","200110"]',
+                '["10","999999"]','["10","999999"]'
+            ]);
+            same(radios.map(function(r){return r.value;}),[
+                "100002","100006","100002","100010","100008","100009"
+            ]);
+        });
+        test("3-key groups select independently even if supplier code repeats", function () {
+            triple.setSelectedKeys([
+                {itemCd:"10",matCd:"100510",VendorWebId:"100006"},
+                {itemCd:"20",matCd:"200110",VendorWebId:"100002"},
+                {itemCd:"10",matCd:"999999",VendorWebId:"100009"}
+            ]);
+            same(triple.getSelectedKeys(),[
+                {itemCd:"20",matCd:"200110",VendorWebId:"100002"},
+                {itemCd:"10",matCd:"100510",VendorWebId:"100006"},
+                {itemCd:"10",matCd:"999999",VendorWebId:"100009"}
+            ]);
+            same(triple.getSelectedRows(),[tripleRows[1],tripleRows[2],tripleRows[5]]);
+            check(tripleTable.querySelectorAll('input[type="radio"]:checked').length===3);
+        });
+        test("3-key display edit updates correct original JSON row and callback context", function () {
+            var editors=tripleTable.querySelectorAll('input[type="number"]');
+            editors[1].value="77";
+            signalChange(editors[1]);
+            check(triple.getRows()[2].qty===77,"second displayed row must map to source row 3");
+            check(triple.getRows()[1].qty===20,"unrelated row must not change");
+            check(triple.getSelectedRows()[1].qty===77,"edited selected row must be exported");
+            same(editContexts[0].key,{itemCd:"10",matCd:"100510",VendorWebId:"100006"});
+            check(editContexts[0].rowIndex===2,"rowIndex must be original index");
+            var radios=tripleTable.querySelectorAll("input[type=radio]");
+            radios[3].checked=true;
+            signalChange(radios[3]);
+            check(selectContexts[0].rowIndex===4);
+            same(selectContexts[0].key,{itemCd:"20",matCd:"200110",VendorWebId:"100010"});
+            same(triple.getSelectedRows().map(function(r){return r.VendorWebId;}),["100006","100010","100009"]);
+        });
+        test("3-key selection survives render / setRows and prunes absent supplier", function () {
+            var chosen=triple.getSelectedKeys();
+            triple.render();
+            same(triple.getSelectedKeys(),chosen);
+            triple.setRows(triple.getRows());
+            same(triple.getSelectedKeys(),chosen);
+            triple.setRows(triple.getRows().filter(function(r) {
+                return !(r.itemCd==="10" && r.matCd==="100510" && r.VendorWebId==="100006");
+            }));
+            same(triple.getSelectedKeys(),[
+                {itemCd:"20",matCd:"200110",VendorWebId:"100010"},
+                {itemCd:"10",matCd:"999999",VendorWebId:"100009"}
+            ]);
+        });
+        test("3-key rejects duplicate full identity and missing third key", function () {
+            var rejected=false;
+            try {triple.setRows([tripleRows[0],tripleRows[0]]);}
+            catch(e){rejected=true;}
+            check(rejected,"duplicate triple must be rejected");
+            rejected=false;
+            try {triple.setRows([{itemCd:"10",matCd:"100510"}]);}
+            catch(e){rejected=true;}
+            check(rejected,"missing supplier key must be rejected");
+            rejected=false;
+            try {triple.setSelectedKeys([{itemCd:"10",matCd:"100510"}]);}
+            catch(e){rejected=true;}
+            check(rejected,"selection requires all 3 keys");
+        });
+        test("3-key vendor and other key fields are immutable", function () {
+            var rejected=false;
+            try {triple.updateRow(
+                {itemCd:"10",matCd:"100510",VendorWebId:"100002"},
+                {VendorWebId:"new"}
+            );} catch(e) {rejected=true;}
+            check(rejected,"updating row identity must be rejected");
+            rejected=false;
+            try {new CellMergeableGrid(document.createElement("table"),{
+                keyFields:["itemCd","matCd","VendorWebId"],
+                columns:[{type:"radio"},{field:"VendorWebId",merge:true}]
+            });} catch(e){rejected=true;}
+            check(rejected,"supplier column cannot merge");
+            rejected=false;
+            try {new CellMergeableGrid(document.createElement("table"),{
+                keyFields:["itemCd","matCd","VendorWebId"],
+                columns:[{type:"radio"},{field:"matCd",editor:"text"}]
+            });} catch(e){rejected=true;}
+            check(rejected,"group key cannot be edited");
+        });
+        test("2-key behavior and group radio name are backward compatible", function () {
+            var simple = new CellMergeableGrid(document.createElement("table"),{
+                keyFields:["key1","key2"],
+                columns:[{type:"radio"},{field:"key1",merge:true},{field:"key2"}]
+            });
+            simple.setRows([{key1:"A",key2:"01"},{key1:"A",key2:"02"}]);
+            same(simple.table.querySelectorAll("input[type=radio]").map(function(r){return r.name;}),["A","A"]);
+            simple.destroy();
+            triple.destroy();
+        });
         test("clearSelection and destroy release markup", function () {
             grid.clearSelection();
             check(grid.getSelectedRows().length === 0);

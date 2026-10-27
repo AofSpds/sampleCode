@@ -1,5 +1,5 @@
 /*
- * CellMergeableGrid v1.0
+ * CellMergeableGrid v1.1
  * Dependency-free, browser-global / CommonJS. No component CSS is injected.
  * Designed to reuse an existing HTML table and its CSS classes.
  */
@@ -16,12 +16,31 @@
         return JSON.parse(JSON.stringify(value));
     }
 
-    function idForGroup(value) {
-        return JSON.stringify([value]);
+    // All keys are compared as JSON scalars. The last key distinguishes rows
+    // within a radio group; the preceding one or two fields define the group.
+    function idForGroup(row, fields) {
+        var values = [];
+        for (var i = 0; i < fields.length - 1; i++) {
+            values.push(row[fields[i]]);
+        }
+        return JSON.stringify(values);
     }
 
     function idForRow(row, fields) {
-        return JSON.stringify([row[fields[0]], row[fields[1]]]);
+        var values = [];
+        for (var i = 0; i < fields.length; i++) {
+            values.push(row[fields[i]]);
+        }
+        return JSON.stringify(values);
+    }
+
+    function sameGroup(left, right, fields) {
+        for (var i = 0; i < fields.length - 1; i++) {
+            if (left[fields[i]] !== right[fields[i]]) {
+                return false;
+            }
+        }
+        return true;
     }
 
     function same(a, b) {
@@ -47,10 +66,17 @@
         }
 
         this.keyFields = options.keyFields || ["key1", "key2"];
-        if (!Array.isArray(this.keyFields) || this.keyFields.length !== 2 ||
-            typeof this.keyFields[0] !== "string" || typeof this.keyFields[1] !== "string" ||
-            this.keyFields[0] === this.keyFields[1]) {
-            throw new Error("keyFields must contain two distinct field names");
+        if (!Array.isArray(this.keyFields) ||
+            (this.keyFields.length !== 2 && this.keyFields.length !== 3)) {
+            throw new Error("keyFields must have 2 or 3 distinct field names");
+        }
+        var knownKeys = Object.create(null);
+        for (var k = 0; k < this.keyFields.length; k++) {
+            var keyField = this.keyFields[k];
+            if (typeof keyField !== "string" || !keyField || knownKeys[keyField]) {
+                throw new Error("keyFields must have 2 or 3 distinct field names");
+            }
+            knownKeys[keyField] = true;
         }
 
         this.options = options;
@@ -61,25 +87,25 @@
         this._ownsTable = false;
 
         var radioColumns = 0;
-        var mergeColumns = 0;
+        var mergedFields = Object.create(null);
         for (var i = 0; i < this.columns.length; i++) {
             var col = this.columns[i];
             if (col.type === "radio") {
                 radioColumns++;
             }
             if (col.merge) {
-                mergeColumns++;
-                if (col.field !== this.keyFields[0]) {
-                    throw new Error("v1 supports merging only keyFields[0]");
+                if (this.keyFields.slice(0, -1).indexOf(col.field) === -1 ||
+                    mergedFields[col.field]) {
+                    throw new Error("merge is allowed once per radio-group key field");
                 }
+                mergedFields[col.field] = true;
             }
-            if ((col.editor || col.editable) &&
-                (col.field === this.keyFields[0] || col.field === this.keyFields[1])) {
-                throw new Error("key fields cannot be edited in v1");
+            if ((col.editor || col.editable) && this.keyFields.indexOf(col.field) !== -1) {
+                throw new Error("key fields cannot be edited");
             }
         }
-        if (radioColumns !== 1 || mergeColumns > 1) {
-            throw new Error("define exactly one radio column and at most one merged column");
+        if (radioColumns !== 1) {
+            throw new Error("define exactly one radio column");
         }
 
         var element = typeof target === "string" ? document.querySelector(target) : target;
@@ -114,8 +140,10 @@
             if (!row || typeof row !== "object" || Array.isArray(row)) {
                 throw new Error("each row must be a JSON object");
             }
-            if (!isScalar(row[this.keyFields[0]]) || !isScalar(row[this.keyFields[1]])) {
-                throw new Error("both key fields must have scalar, non-null values");
+            for (var k = 0; k < this.keyFields.length; k++) {
+                if (!isScalar(row[this.keyFields[k]])) {
+                    throw new Error("all key fields must have scalar, non-null values");
+                }
             }
             var identity = idForRow(row, this.keyFields);
             if (seen[identity]) {
@@ -156,7 +184,7 @@
         var result = [];
         for (var i = 0; i < this._rows.length; i++) {
             var row = this._rows[i];
-            if (this._selected[idForGroup(row[this.keyFields[0]])] === idForRow(row, this.keyFields)) {
+            if (this._selected[idForGroup(row, this.keyFields)] === idForRow(row, this.keyFields)) {
                 result.push(jsonCopy(row));
             }
         }
@@ -168,8 +196,9 @@
         var result = [];
         for (var i = 0; i < chosen.length; i++) {
             var key = {};
-            key[this.keyFields[0]] = chosen[i][this.keyFields[0]];
-            key[this.keyFields[1]] = chosen[i][this.keyFields[1]];
+            for (var j = 0; j < this.keyFields.length; j++) {
+                key[this.keyFields[j]] = chosen[i][this.keyFields[j]];
+            }
             result.push(key);
         }
         return result;
@@ -187,12 +216,17 @@
         var next = Object.create(null);
         for (var j = 0; j < keys.length; j++) {
             var key = keys[j];
-            if (!key || !isScalar(key[this.keyFields[0]]) || !isScalar(key[this.keyFields[1]])) {
+            if (!key || typeof key !== "object" || Array.isArray(key)) {
                 throw new Error("invalid composite key");
+            }
+            for (var k = 0; k < this.keyFields.length; k++) {
+                if (!isScalar(key[this.keyFields[k]])) {
+                    throw new Error("invalid composite key");
+                }
             }
             var id = idForRow(key, this.keyFields);
             if (present[id]) {
-                next[idForGroup(key[this.keyFields[0]])] = id;
+                next[idForGroup(key, this.keyFields)] = id;
             }
         }
         this._selected = next;
@@ -212,9 +246,10 @@
         if (!key || !patch || typeof patch !== "object" || Array.isArray(patch)) {
             throw new Error("updateRow expects a composite key and a patch object");
         }
-        if (Object.prototype.hasOwnProperty.call(patch, this.keyFields[0]) ||
-            Object.prototype.hasOwnProperty.call(patch, this.keyFields[1])) {
-            throw new Error("key fields cannot be changed by updateRow");
+        for (var k = 0; k < this.keyFields.length; k++) {
+            if (Object.prototype.hasOwnProperty.call(patch, this.keyFields[k])) {
+                throw new Error("key fields cannot be changed by updateRow");
+            }
         }
         var id = idForRow(key, this.keyFields);
         for (var i = 0; i < this._rows.length; i++) {
@@ -233,8 +268,9 @@
     CellMergeableGrid.prototype._context = function (rowIndex, field) {
         var row = this._rows[rowIndex];
         var key = {};
-        key[this.keyFields[0]] = row[this.keyFields[0]];
-        key[this.keyFields[1]] = row[this.keyFields[1]];
+        for (var i = 0; i < this.keyFields.length; i++) {
+            key[this.keyFields[i]] = row[this.keyFields[i]];
+        }
         return { rowIndex: rowIndex, field: field || null, key: key, grid: this };
     };
 
@@ -303,19 +339,24 @@
     CellMergeableGrid.prototype._radio = function (rowIndex) {
         var self = this;
         var row = this._rows[rowIndex];
-        var groupKey = row[this.keyFields[0]];
+        var groupId = idForGroup(row, this.keyFields);
+        var groupName = this.keyFields.length === 2 ?
+            String(row[this.keyFields[0]]) : groupId;
         var node = document.createElement("input");
         node.type = "radio";
-        node.name = String(this.options.radioNamePrefix || "") + String(groupKey);
-        node.value = String(row[this.keyFields[1]]);
-        node.checked = this._selected[idForGroup(groupKey)] === idForRow(row, this.keyFields);
-        node.setAttribute("aria-label", String(groupKey) + " / " +
-            String(row[this.keyFields[1]]) + " 선택");
+        node.name = String(this.options.radioNamePrefix || "") + groupName;
+        node.value = String(row[this.keyFields[this.keyFields.length - 1]]);
+        node.checked = this._selected[groupId] === idForRow(row, this.keyFields);
+        var labels = [];
+        for (var i = 0; i < this.keyFields.length; i++) {
+            labels.push(String(row[this.keyFields[i]]));
+        }
+        node.setAttribute("aria-label", labels.join(" / ") + " 선택");
         node.addEventListener("change", function () {
             if (!node.checked) {
                 return;
             }
-            self._selected[idForGroup(groupKey)] = idForRow(row, self.keyFields);
+            self._selected[groupId] = idForRow(row, self.keyFields);
             if (typeof self.options.onSelect === "function") {
                 self.options.onSelect(jsonCopy(row), self._context(rowIndex, null));
             }
@@ -376,7 +417,7 @@
         var positionsByKey = Object.create(null);
         var groups = [];
         for (var i = 0; i < this._rows.length; i++) {
-            var key = idForGroup(this._rows[i][this.keyFields[0]]);
+            var key = idForGroup(this._rows[i], this.keyFields);
             if (positionsByKey[key] === undefined) {
                 positionsByKey[key] = groups.length;
                 groups.push([]);
@@ -422,15 +463,14 @@
             for (c = 0; c < this.columns.length; c++) {
                 var column = this.columns[c];
                 if (column.merge && position > 0 &&
-                    same(row[this.keyFields[0]], this._rows[displayOrder[position - 1]][this.keyFields[0]])) {
+                    sameGroup(row, this._rows[displayOrder[position - 1]], this.keyFields)) {
                     continue;
                 }
                 var cell = this._cell(column, i);
                 if (column.merge) {
                     var span = 1;
                     while (position + span < displayOrder.length &&
-                        same(row[this.keyFields[0]],
-                            this._rows[displayOrder[position + span]][this.keyFields[0]])) {
+                        sameGroup(row, this._rows[displayOrder[position + span]], this.keyFields)) {
                         span++;
                     }
                     if (span > 1) {
