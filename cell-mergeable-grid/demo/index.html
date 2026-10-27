@@ -7,7 +7,7 @@
 </head>
 <body>
     <h1>CellMergeableGrid — 3개 키 / 2개 컬럼 병합</h1>
-    <div class="note">품목+자재코드 그룹별 공급업체 단일 선택 · 화면 그룹화 · JSON 원본 순서 유지. 데모 CSS만 사용합니다.</div>
+    <div class="note">품목 ASC → 자재코드 ASC · 그룹별 공급업체 단일 선택 · JSON 원본 순서 유지. 데모 CSS만 사용합니다.</div>
 
     <div class="controls">
         <button id="show-selected">선택 행 JSON 추출</button>
@@ -111,6 +111,7 @@
         }
         var grid = new CellMergeableGrid("#grid", {
             keyFields:["itemCd","matCd","VendorWebId"],
+            groupOrder:"asc", // 품목 ASC, 다음 자재코드 ASC
             columns:[
                 {type:"radio",title:"선택"},
                 {field:"itemCd",title:"품목",merge:true,className:"group-cell"},

@@ -236,11 +236,11 @@
             var radios=tripleTable.querySelectorAll("input[type=radio]");
             same(radios.map(function(r){return r.name;}),[
                 '["10","100510"]','["10","100510"]',
-                '["20","200110"]','["20","200110"]',
-                '["10","999999"]','["10","999999"]'
+                '["10","999999"]','["10","999999"]',
+                '["20","200110"]','["20","200110"]'
             ]);
             same(radios.map(function(r){return r.value;}),[
-                "100002","100006","100002","100010","100008","100009"
+                "100002","100006","100008","100009","100002","100010"
             ]);
         });
         test("3-key groups select independently even if supplier code repeats", function () {
@@ -267,8 +267,8 @@
             same(editContexts[0].key,{itemCd:"10",matCd:"100510",VendorWebId:"100006"});
             check(editContexts[0].rowIndex===2,"rowIndex must be original index");
             var radios=tripleTable.querySelectorAll("input[type=radio]");
-            radios[3].checked=true;
-            signalChange(radios[3]);
+            radios[5].checked=true;
+            signalChange(radios[5]);
             check(selectContexts[0].rowIndex===4);
             same(selectContexts[0].key,{itemCd:"20",matCd:"200110",VendorWebId:"100010"});
             same(triple.getSelectedRows().map(function(r){return r.VendorWebId;}),["100006","100010","100009"]);
@@ -320,6 +320,66 @@
                 columns:[{type:"radio"},{field:"matCd",editor:"text"}]
             });} catch(e){rejected=true;}
             check(rejected,"group key cannot be edited");
+        });
+
+        test("three-key grids sort itemCd ASC then matCd ASC by default", function () {
+            var unordered = [
+                {itemCd:"50",matCd:"402030",VendorWebId:"A",qty:1},
+                {itemCd:"20",matCd:"200110",VendorWebId:"B",qty:2},
+                {itemCd:"10",matCd:"900",VendorWebId:"C",qty:3},
+                {itemCd:"10",matCd:"100",VendorWebId:"D",qty:4},
+                {itemCd:"30",matCd:"300001",VendorWebId:"E",qty:5},
+                {itemCd:"10",matCd:"100",VendorWebId:"F",qty:6}
+            ];
+            triple.setRows(unordered);
+            var radios = tripleTable.querySelectorAll("input[type=radio]");
+            same(radios.map(function (r) {return r.name;}), [
+                '["10","100"]','["10","100"]','["10","900"]',
+                '["20","200110"]','["30","300001"]','["50","402030"]'
+            ]);
+            same(radios.map(function (r) {return r.value;}), ["D","F","C","B","E","A"]);
+            check(tripleTable.tBodies[0].rows[0].cells[1].rowSpan === 2);
+            check(tripleTable.tBodies[0].rows[0].cells[2].rowSpan === 2);
+            same(triple.getRows(), unordered, "original input order must not change");
+            triple.setSelectedKeys([
+                {itemCd:"10",matCd:"100",VendorWebId:"F"},
+                {itemCd:"20",matCd:"200110",VendorWebId:"B"}
+            ]);
+            same(triple.getSelectedRows(), [unordered[1], unordered[5]]);
+        });
+        test("groupOrder input preserves first-seen group order when requested", function () {
+            var original = new CellMergeableGrid(document.createElement("table"), {
+                keyFields:["itemCd","matCd","VendorWebId"],
+                groupOrder:"input",
+                columns:[{type:"radio"},{field:"itemCd",merge:true},{field:"matCd",merge:true}]
+            });
+            original.setRows([
+                {itemCd:"50",matCd:"402030",VendorWebId:"A"},
+                {itemCd:"10",matCd:"100510",VendorWebId:"B"},
+                {itemCd:"20",matCd:"200110",VendorWebId:"C"}
+            ]);
+            same(original.table.querySelectorAll("input[type=radio]").map(function(r) {
+                return r.name;
+            }), ['["50","402030"]','["10","100510"]','["20","200110"]']);
+            original.destroy();
+        });
+        test("two-key grids keep prior first-seen default, ASC opt-in sorts numeric codes", function () {
+            function make(opts) {
+                return new CellMergeableGrid(document.createElement("table"),{
+                    keyFields:["key1","key2"],
+                    groupOrder:opts,
+                    columns:[{type:"radio"},{field:"key1",merge:true}]
+                });
+            }
+            var original=make();
+            var sorted=make("asc");
+            var data=[{key1:"20",key2:"1"},{key1:"2",key2:"1"}];
+            original.setRows(data);
+            sorted.setRows(data);
+            same(original.table.querySelectorAll("input[type=radio]").map(function(r){return r.name;}), ["20","2"]);
+            same(sorted.table.querySelectorAll("input[type=radio]").map(function(r){return r.name;}), ["2","20"]);
+            original.destroy();
+            sorted.destroy();
         });
         test("2-key behavior and group radio name are backward compatible", function () {
             var simple = new CellMergeableGrid(document.createElement("table"),{

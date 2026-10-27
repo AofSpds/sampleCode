@@ -12,12 +12,13 @@ JSP / jQuery-based legacy screens can use this dependency-free JavaScript compon
 | Merge | `merge: true` is supported on group-key columns (one or both in 3-key mode). Display rows are automatically grouped by the full radio-group key |
 | Radio | A separate radio per row. In 2-key mode `name=String(key1)`; in 3-key mode `name=JSON.stringify([itemCd,matCd])`; `value` is the last key |
 | Selection | One chosen row per group; different `itemCd + matCd` groups remain independent |
+| Display order | **3-key mode defaults to group ASC** (`itemCd`, then `matCd`); 2-key mode retains first-seen ordering. `groupOrder: "input"` opts out; `"asc"` opts in for 2-key mode |
 | Retention | Selection survives render() and setRows() if the selected composite key remains |
 | Output | getSelectedRows() returns selected **complete row objects** in source order |
 | Editors | Text, number, checkbox, select; edits mutate the internal row object |
 | Styles | No component CSS injected; existing table and CSS classes are reused |
 
-The component **automatically groups visual rows by the complete radio-group key** (stable first-seen group order, then original order within each group). With three key fields, `itemCd` alone does NOT merge two groups if their `matCd` values differ. In 2-key mode the behavior remains based on key1. **The input array and internal row order are not changed:** `getRows()` and `getSelectedRows()` return complete JSON rows in original input order; selection and editor callbacks still reference original row indices.
+The component **automatically groups visual rows by the complete radio-group key** (ascending group-key order by default for 3-key grids, then original order within each group). With three key fields, `itemCd` alone does NOT merge two groups if their `matCd` values differ. In 2-key mode the behavior remains based on key1. **The input array and internal row order are not changed:** `getRows()` and `getSelectedRows()` return complete JSON rows in original input order; selection and editor callbacks still reference original row indices.
 
 ## Usage in an existing JSP
 
@@ -74,6 +75,7 @@ Use the first two fields for a shared item/material **radio group** and the last
 ~~~javascript
 var grid = new CellMergeableGrid("#grid", {
     keyFields: ["itemCd", "matCd", "VendorWebId"],
+    groupOrder: "asc", // itemCd ASC, then matCd ASC (default in 3-key mode)
     columns: [
         { type: "radio", title: "선택" },
         { field: "itemCd", title: "품목", merge: true },
@@ -121,7 +123,7 @@ Editor changes are committed on the native change event (typically when the cont
 
 | Method | Returns / effect |
 | --- | --- |
-| setRows(jsonArray) | Deep-copies rows, validates composite-key uniqueness, preserves valid selections; groups only display order by the complete group key |
+| setRows(jsonArray) | Deep-copies rows, validates composite-key uniqueness, preserves valid selections; groups only display order, with configurable groupOrder |
 | getRows() | JSON array containing all rows and edits |
 | getSelectedRows() | JSON array containing one complete row per selected radio group (in original input order) |
 | getSelectedKeys() | Array of objects containing **all** key fields (2 or 3), in original input order |

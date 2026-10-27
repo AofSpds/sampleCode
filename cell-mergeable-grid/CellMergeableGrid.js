@@ -1,5 +1,5 @@
 /*
- * CellMergeableGrid v1.1
+ * CellMergeableGrid v1.2
  * Dependency-free, browser-global / CommonJS. No component CSS is injected.
  * Designed to reuse an existing HTML table and its CSS classes.
  */
@@ -47,6 +47,25 @@
         return a === b;
     }
 
+    // Compare numeric-looking codes numerically; otherwise use string order.
+    // Row identities remain type-sensitive and unchanged.
+    function compareCode(a, b) {
+        if (a === b) {
+            return 0;
+        }
+        var left = String(a);
+        var right = String(b);
+        if (/^[0-9]+$/.test(left) && /^[0-9]+$/.test(right)) {
+            var leftNumber = Number(left);
+            var rightNumber = Number(right);
+            if (isFinite(leftNumber) && isFinite(rightNumber) &&
+                leftNumber !== rightNumber) {
+                return leftNumber < rightNumber ? -1 : 1;
+            }
+        }
+        return left < right ? -1 : (left > right ? 1 : 0);
+    }
+
     function addClass(element, className) {
         if (className && typeof className === "string") {
             element.className = (element.className ? element.className + " " : "") + className;
@@ -80,6 +99,13 @@
         }
 
         this.options = options;
+        // Three-key grids default to ascending group-key order; 2-key
+        // grids retain first-seen ordering for backward compatibility.
+        this.groupOrder = options.groupOrder ||
+            (this.keyFields.length === 3 ? "asc" : "input");
+        if (this.groupOrder !== "asc" && this.groupOrder !== "input") {
+            throw new Error('groupOrder must be "asc" or "input"');
+        }
         this.columns = options.columns.slice();
         this._selected = Object.create(null);
         this._rows = [];
@@ -423,6 +449,23 @@
                 groups.push([]);
             }
             groups[positionsByKey[key]].push(i);
+        }
+        if (this.groupOrder === "asc") {
+            // Sort only the displayed groups (itemCd ASC, matCd ASC).
+            // Rows inside each group and the original JSON array stay intact.
+            var self = this;
+            groups.sort(function (a, b) {
+                var left = self._rows[a[0]];
+                var right = self._rows[b[0]];
+                for (var k = 0; k < self.keyFields.length - 1; k++) {
+                    var field = self.keyFields[k];
+                    var cmp = compareCode(left[field], right[field]);
+                    if (cmp !== 0) {
+                        return cmp;
+                    }
+                }
+                return a[0] - b[0]; // stable fallback for equal sort values
+            });
         }
         for (var g = 0; g < groups.length; g++) {
             for (var j = 0; j < groups[g].length; j++) {
