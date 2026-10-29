@@ -122,12 +122,17 @@ $.fn.keyinDropdown = function (settings) {
         function loadRows(term, onSuccess, onFailure) {
             var extra = typeof config.ajax.data === 'function'
                 ? config.ajax.data.call($input[0]) : config.ajax.data;
+            var requestData = $.extend({}, extra, { term: term });
+            // JSON POST는 선택 옵션이며, 미설정 시 기존 폼 파라미터 전송을 유지한다.
+            var isJson = config.ajax.contentType &&
+                config.ajax.contentType.indexOf('application/json') === 0;
 
             $.ajax({
                 url: config.ajax.url,
                 type: config.ajax.type || 'GET',
                 dataType: 'json',
-                data: $.extend({}, extra, { term: term }),
+                contentType: config.ajax.contentType,
+                data: isJson ? JSON.stringify(requestData) : requestData,
                     // 응답이 배열이면 그대로, 객체이면 responseField(예: successList)에서 추출한다.
                 success: function (result) {
                     var rows = $.isArray(result) ? result
