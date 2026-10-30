@@ -26,6 +26,7 @@ $.fn.keyinDropdown = function (settings) {
                 options: [],       // [{ code: '100002', codeLabel: '(주)엘지상사' }]
                 ajax: null,        // { url, type, data, responseField: 'successList' }
                 displayMode: 'code', // code / codeLabel / both / custom
+                autoSelectSingle: false, // AJAX 결과 1건 자동 선택(기본 비활성화)
                 displayFormat: null, // custom: function(item) { return ...; }
                 listWidth: 260,
                 onKeyin: null,
@@ -38,7 +39,9 @@ $.fn.keyinDropdown = function (settings) {
             initialCodeLabel = $input.attr('data-code-label'),
             $codeInput = null,
             $clear = $('<button type="button" class="keyin-clear" aria-label="입력 지우기">×</button>'),
-            $arrow = $('<button type="button" class="keyin-arrow" aria-label="옵션 열기"></button>');
+            $arrow = $('<button type="button" class="keyin-arrow" aria-label="옵션 열기"></button>'),
+            inputRevision = 0,
+            searchRequestId = 0;
 
         // 표시 모드는 초기화할 때 확정한다. custom은 displayFormat 콜백이 필수다.
         if ($.inArray(config.displayMode, ['code', 'codeLabel', 'both', 'custom']) === -1) {
@@ -111,10 +114,18 @@ $.fn.keyinDropdown = function (settings) {
         // 선택 항목 저장: 화면 표시값 갱신 → hidden 코드 갱신 → 항목 데이터 보관.
         // onSelect는 호출자가 필요하면 change 이벤트 등을 별도로 발생시킬 수 있다.
         function setSelected(item) {
+            inputRevision++;
             $input.val(displayText(item));
             if ($codeInput) $codeInput.val(item.code);
             $input.data('keyinDropdownSelected', item);
             setClear();
+        }
+
+        // 요청 후 자재/플랜트 등 AJAX 조건이 바뀌었는지 확인한다.
+        function matchesContext(requestContext) {
+            var current = typeof config.ajax.data === 'function'
+                ? config.ajax.data.call($input[0]) : config.ajax.data;
+            return $.param(current || {}) === requestContext;
         }
 
         // 실제 AJAX는 목록 검색/오픈 시 실행하며, 초기 코드의 명칭 복원에도 사용한다.
@@ -123,6 +134,7 @@ $.fn.keyinDropdown = function (settings) {
             var extra = typeof config.ajax.data === 'function'
                 ? config.ajax.data.call($input[0]) : config.ajax.data;
             var requestData = $.extend({}, extra, { term: term });
+            var requestContext = $.param(extra || {});
             // JSON POST는 선택 옵션이며, 미설정 시 기존 폼 파라미터 전송을 유지한다.
             var isJson = config.ajax.contentType &&
                 config.ajax.contentType.indexOf('application/json') === 0;
@@ -138,7 +150,7 @@ $.fn.keyinDropdown = function (settings) {
                     var rows = $.isArray(result) ? result
                         : (result && config.ajax.responseField
                             ? result[config.ajax.responseField] : []);
-                    onSuccess($.isArray(rows) ? rows : []);
+                    onSuccess($.isArray(rows) ? rows : [], requestContext);
                 },
                     // 자동완성 요청 중단용 실패 콜백과 외부 onError 콜백을 모두 처리한다.
                 error: function (xhr) {
@@ -156,11 +168,37 @@ $.fn.keyinDropdown = function (settings) {
                 // 빈 검색어('')로 호출하면 해당 자재의 목록 전체를 보여준다.
             source: config.ajax && config.ajax.url ? function (request, response) {
                 var term = request.term.toLowerCase();
+                var requestRevision = inputRevision;
+                var requestId = ++searchRequestId;
 
-                loadRows(request.term, function (rows) {
-                    response($.grep(toItems(rows), function (item) {
+                loadRows(request.term, function (rows, requestContext) {
+                    // 설정이 활성화된 경우, 이전 AJAX 응답으로 값을 덮어쓰지 않는다.
+                    if (config.autoSelectSingle &&
+                        (requestId !== searchRequestId ||
+                         inputRevision !== requestRevision ||
+                         !matchesContext(requestContext))) {
+                        response([]);
+                        return;
+                    }
+
+                    var items = $.grep(toItems(rows), function (item) {
                         return item.label.toLowerCase().indexOf(term) !== -1;
-                    }));
+                    });
+
+                    // 빈 입력창에서 전체 목록을 열었을 때 유효한 후보가 1건이면 자동 선택한다.
+                    if (config.autoSelectSingle && request.term === '' &&
+                        items.length === 1 && $.trim(items[0].code) !== '' &&
+                        $.trim($input.val() || '') === '' &&
+                        (!$codeInput || $.trim($codeInput.val() || '') === '') &&
+                        !$input.data('keyinDropdownSelected')) {
+                        setSelected(items[0]);
+                        response([]); // 자동 선택 후 목록을 별도로 열지 않는다.
+                        if (typeof config.onSelect === 'function') {
+                            config.onSelect.call($input[0], items[0]);
+                        }
+                        return;
+                    }
+                    response(items);
                 }, function () {
                     response([]);
                 });
@@ -195,6 +233,7 @@ $.fn.keyinDropdown = function (settings) {
         // 사용자가 직접 문자를 수정하면 이전 선택 코드를 무효화한다.
         // codeLabel/both/custom 모드의 hidden은 빈 값이 되어 잘못된 코드 전송을 막는다.
         $input.on('input.keyinDropdown', function () {
+            inputRevision++;
             // 다른 표시 모드에서는 목록 선택 전까지 서버 코드값을 비운다.
             if ($codeInput) $codeInput.val('');
             $input.removeData('keyinDropdownSelected');
@@ -219,6 +258,7 @@ $.fn.keyinDropdown = function (settings) {
 
         // X 버튼은 표시값·전송 코드·선택 항목을 모두 비운다.
         $clear.on('click.keyinDropdown', function () {
+            inputRevision++;
             $input.autocomplete('close').val('');
             if ($codeInput) $codeInput.val('');
             $input.removeData('keyinDropdownSelected');
@@ -251,8 +291,11 @@ $.fn.keyinDropdown = function (settings) {
                 // 기존 코드만 있는 JSP 행은 비동기로 업체명을 조회하여 표시한다.
                 // 조회 중 사용자가 수정/선택/삭제했다면 과거 응답으로 덮어쓰지 않는다.
                 // 비동기 조회 중 사용자가 값을 변경했다면 예전 결과로 덮어쓰지 않는다.
-                loadRows('', function (rows) {
-                    if ($codeInput.val() !== initialCode ||
+                var restoreRevision = inputRevision;
+                loadRows('', function (rows, requestContext) {
+                    if (inputRevision !== restoreRevision ||
+                        (config.autoSelectSingle && !matchesContext(requestContext)) ||
+                        $codeInput.val() !== initialCode ||
                         $input.data('keyinDropdownSelected')) return;
 
                     var item = $.grep(toItems(rows), function (row) {

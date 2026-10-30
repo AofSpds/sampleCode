@@ -61,6 +61,7 @@ function initVendorCombo() {
     }).keyinDropdown({
         listWidth: 330,
         displayMode: 'codeLabel', // 화면은 업체명, 전송은 업체코드
+        autoSelectSingle: true, // 빈 콤보에서 AJAX 결과 1건이면 자동 선택(기본 false)
         ajax: {
             url: "<c:url value='/ajax/pr/retrieveVendorByMatCdList.do'/>",
             type: 'GET',
@@ -103,6 +104,16 @@ function initVendorCombo() {
 - `data` 함수의 `this`는 현재 **표시 input**입니다. `getPartRows($(this).closest("tr"))`로 소속 그룹의 현재 `matCd`를 읽습니다. 자재가 바뀌면 기존 업체 선택값을 X 버튼으로 초기화합니다.
 - ADD/COPY에서는 새 input에 이 AJAX 설정을 초기화하고, **실제 업체 목록은 사용자가 검색/목록 열기 시점에 서버 조회**합니다. 기존 AJAX `source` 함수를 복제하지 않습니다.
 - 실패 시 `onError(xhr)`가 호출됩니다. 응답에 지정된 배열이 없으면 목록을 비워 보여줍니다.
+
+## AJAX 단일 후보 자동 선택 (선택 옵션)
+
+`autoSelectSingle: true`를 설정한 AJAX 콤보만 자동 선택합니다. 기본값은 `false`이므로 기존 화면의 동작은 바뀌지 않습니다.
+
+- **자동 선택:** 빈 표시 input에서 목록을 열어(`term: ''`) 필터 결과가 정확히 1건이고 `code`가 비어 있지 않으며 전송용 hidden에도 기존 코드가 없는 경우. `setSelected(item)`을 재사용해 표시값·전송 코드를 함께 갱신하고 `onSelect(item)`을 한 번 실행합니다. 자동 선택 후 목록은 닫힌 상태로 유지합니다.
+- **기존 동작 유지:** 0건 또는 2건 이상, 검색어 직접 입력으로 1건만 남은 경우, 이미 선택된 코드/표시값이 있는 경우, 정적 `options` 방식.
+- **초기화 시 자동조회 없음:** 빈 JSP input을 초기화했다고 자동 조회하지 않습니다. 최초 코드가 있는 경우의 AJAX 명칭 복원은 별도 기존 기능이며 자동 선택 `onSelect`를 발생시키지 않습니다.
+- **늦은 AJAX 응답 보호:** 전송 중 입력·X 삭제·선택이 바뀌었거나 새 검색이 시작됐거나 `ajax.data()`의 자재코드/플랜트 등 조회 조건이 달라지면 이전 응답을 자동 선택하지 않습니다. 조건 비교를 위해 `ajax.data()`는 현재 값을 반환해야 합니다.
+- 자재코드/플랜트 변경 후 **기존 업체 선택값을 지우는 처리**는 종전처럼 JSP 팝업 콜백/화면 이벤트에서 수행합니다. 이 옵션은 기존 선택을 강제로 변경하지 않습니다.
 
 ## displayMode와 서버 전송값
 
