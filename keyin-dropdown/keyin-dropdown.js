@@ -295,7 +295,7 @@ $.fn.keyinDropdown = function (settings) {
 
         // X 버튼은 표시값·전송 코드·선택 항목을 모두 비운다.
         $clear.on('click.keyinDropdown', function () {
-            setSingleLocked(false);
+            if (singleLocked) setSingleLocked(false);
             inputRevision++;
             $input.autocomplete('close').val('');
             if ($codeInput) $codeInput.val('');
