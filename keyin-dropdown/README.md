@@ -62,6 +62,7 @@ function initVendorCombo() {
         listWidth: 330,
         displayMode: 'codeLabel', // 화면은 업체명, 전송은 업체코드
         autoSelectSingle: true, // 빈 콤보에서 AJAX 결과 1건이면 자동 선택(기본 false)
+        lockWhenSingle: true, // 후보 1건이면 자동 선택 후 잠금(기본 false)
         ajax: {
             url: "<c:url value='/ajax/pr/retrieveVendorByMatCdList.do'/>",
             type: 'GET',
@@ -114,6 +115,15 @@ function initVendorCombo() {
 - **초기화 시 자동조회 없음:** 빈 JSP input을 초기화했다고 자동 조회하지 않습니다. 최초 코드가 있는 경우의 AJAX 명칭 복원은 별도 기존 기능이며 자동 선택 `onSelect`를 발생시키지 않습니다.
 - **늦은 AJAX 응답 보호:** 전송 중 입력·X 삭제·선택이 바뀌었거나 새 검색이 시작됐거나 `ajax.data()`의 자재코드/플랜트 등 조회 조건이 달라지면 이전 응답을 자동 선택하지 않습니다. 조건 비교를 위해 `ajax.data()`는 현재 값을 반환해야 합니다.
 - 자재코드/플랜트 변경 후 **기존 업체 선택값을 지우는 처리**는 종전처럼 JSP 팝업 콜백/화면 이벤트에서 수행합니다. 이 옵션은 기존 선택을 강제로 변경하지 않습니다.
+
+### 단일 후보 잠금: `lockWhenSingle`
+
+- `autoSelectSingle: true`와 `lockWhenSingle: true`를 **모두** 설정한 AJAX 콤보에만 적용합니다. 기본값은 `false`입니다. 정적 `options`의 동작은 변경하지 않습니다.
+- 전체 목록 조회(`term: ''`)에서 유효한 후보가 1건이면 자동 선택하고, 입력을 `readonly`로 전환하며 X·화살표 버튼을 숨깁니다. 이름이 있는 hidden은 **disabled 하지 않으므로** 기존 코드가 계속 전송됩니다. `keyinDropdownLocked` 데이터로 잠금 상태를 확인할 수 있습니다.
+- 해당 후보가 이미 선택되어 있으면 코드를 유지하고 잠그되 `onSelect`를 다시 호출하지 않습니다. 새로 선택하는 경우에만 `onSelect`가 한 번 실행됩니다. 0건·복수건이거나 검색어를 직접 입력했을 때는 잠그지 않습니다.
+- 자재/플랜트 변경 시 **변경된 값을 먼저 반영**하고 기존처럼 `$combo.next('.keyin-clear').trigger('click')`로 업체를 초기화하세요. X가 숨겨진 상태여도 이 호출로 잠금이 해제되며, 뒤이어 `$combo.autocomplete('search', '')`로 재조회할 수 있습니다. 1건이면 다시 선택·잠금, 그 외에는 선택 가능한 상태를 유지합니다.
+- JSP 초기 코드가 있을 때에는 AJAX 응답으로 후보가 1건이고 **기존 코드와 같은 업체**라고 확인된 경우에만 잠급니다. `data-code-label`이 있는 초기값도 후보 수를 확인하기 위해 추가 AJAX 요청이 발생할 수 있습니다. 이 초기 복원/확인에서는 `onSelect`를 호출하지 않으므로, 업체명·ERP ID 등 별도 hidden 초기값은 JSP에서 제공해야 합니다.
+- 기존 input 자체가 원래 `readonly`였다면 잠금을 해제해도 원래 속성을 유지합니다. 이전 AJAX 응답이 늦게 도착했을 때는 선택 및 잠금을 적용하지 않습니다.
 
 ## displayMode와 서버 전송값
 

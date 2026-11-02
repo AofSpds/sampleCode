@@ -27,6 +27,7 @@ $.fn.keyinDropdown = function (settings) {
                 ajax: null,        // { url, type, data, responseField: 'successList' }
                 displayMode: 'code', // code / codeLabel / both / custom
                 autoSelectSingle: false, // AJAX 결과 1건 자동 선택(기본 비활성화)
+                lockWhenSingle: false, // AJAX 단일 후보 확정 후 입력 잠금(기본 비활성화)
                 displayFormat: null, // custom: function(item) { return ...; }
                 listWidth: 260,
                 onKeyin: null,
@@ -41,7 +42,9 @@ $.fn.keyinDropdown = function (settings) {
             $clear = $('<button type="button" class="keyin-clear" aria-label="입력 지우기">×</button>'),
             $arrow = $('<button type="button" class="keyin-arrow" aria-label="옵션 열기"></button>'),
             inputRevision = 0,
-            searchRequestId = 0;
+            searchRequestId = 0,
+            initialReadOnly = !!$input.prop('readOnly'),
+            singleLocked = false;
 
         // 표시 모드는 초기화할 때 확정한다. custom은 displayFormat 콜백이 필수다.
         if ($.inArray(config.displayMode, ['code', 'codeLabel', 'both', 'custom']) === -1) {
@@ -111,6 +114,17 @@ $.fn.keyinDropdown = function (settings) {
             $clear.toggleClass('is-visible', !!hasValue);
         }
 
+        // 후보 1건 확정 시 입력과 버튼만 잠근다. hidden 코드는 계속 폼 전송된다.
+        // 숨긴 X 버튼은 자재 변경 콜백의 trigger('click')으로 계속 초기화할 수 있다.
+        function setSingleLocked(locked) {
+            singleLocked = !!locked;
+            $input.prop('readOnly', singleLocked || initialReadOnly);
+            $input.data('keyinDropdownLocked', singleLocked);
+            $clear.css('display', singleLocked ? 'none' : '');
+            $arrow.css('display', singleLocked ? 'none' : '');
+            if (singleLocked) $input.autocomplete('close');
+        }
+
         // 선택 항목 저장: 화면 표시값 갱신 → hidden 코드 갱신 → 항목 데이터 보관.
         // onSelect는 호출자가 필요하면 change 이벤트 등을 별도로 발생시킬 수 있다.
         function setSelected(item) {
@@ -167,6 +181,10 @@ $.fn.keyinDropdown = function (settings) {
                 // 검색어는 code와 codeLabel을 합친 label에서 비교한다.
                 // 빈 검색어('')로 호출하면 해당 자재의 목록 전체를 보여준다.
             source: config.ajax && config.ajax.url ? function (request, response) {
+                if (singleLocked) {
+                    response([]); // readonly에서도 키보드/스크립트의 목록 열기 차단
+                    return;
+                }
                 var term = request.term.toLowerCase();
                 var requestRevision = inputRevision;
                 var requestId = ++searchRequestId;
@@ -185,6 +203,22 @@ $.fn.keyinDropdown = function (settings) {
                         return item.label.toLowerCase().indexOf(term) !== -1;
                     });
 
+                    // 단일 후보가 기존 선택 코드와 같으면 선택 콜백을 중복 호출하지 않고 잠근다.
+                    if (config.autoSelectSingle && config.lockWhenSingle &&
+                        request.term === '' && items.length === 1 &&
+                        $.trim(items[0].code) !== '') {
+                        var selected = $input.data('keyinDropdownSelected');
+                        var currentCode = $codeInput
+                            ? $.trim($codeInput.val() || '')
+                            : $.trim(selected ? selected.code : $input.val());
+                        if (currentCode === items[0].code) {
+                            setSelected(items[0]);
+                            setSingleLocked(true);
+                            response([]);
+                            return;
+                        }
+                    }
+
                     // 빈 입력창에서 전체 목록을 열었을 때 유효한 후보가 1건이면 자동 선택한다.
                     if (config.autoSelectSingle && request.term === '' &&
                         items.length === 1 && $.trim(items[0].code) !== '' &&
@@ -192,6 +226,7 @@ $.fn.keyinDropdown = function (settings) {
                         (!$codeInput || $.trim($codeInput.val() || '') === '') &&
                         !$input.data('keyinDropdownSelected')) {
                         setSelected(items[0]);
+                        if (config.lockWhenSingle) setSingleLocked(true);
                         response([]); // 자동 선택 후 목록을 별도로 열지 않는다.
                         if (typeof config.onSelect === 'function') {
                             config.onSelect.call($input[0], items[0]);
@@ -233,6 +268,7 @@ $.fn.keyinDropdown = function (settings) {
         // 사용자가 직접 문자를 수정하면 이전 선택 코드를 무효화한다.
         // codeLabel/both/custom 모드의 hidden은 빈 값이 되어 잘못된 코드 전송을 막는다.
         $input.on('input.keyinDropdown', function () {
+            if (singleLocked) return;
             inputRevision++;
             // 다른 표시 모드에서는 목록 선택 전까지 서버 코드값을 비운다.
             if ($codeInput) $codeInput.val('');
@@ -243,11 +279,12 @@ $.fn.keyinDropdown = function (settings) {
             }
         // input 클릭은 현재 표시 내용과 관계없이 전체 옵션 목록을 요청한다.
         }).on('click.keyinDropdown', function () {
-            $input.autocomplete('search', '');
+            if (!singleLocked) $input.autocomplete('search', '');
         });
 
         // ▼ 버튼은 현재 목록의 열림/닫힘을 전환한다.
         $arrow.on('click.keyinDropdown', function () {
+            if (singleLocked) return;
             var $menu = $input.autocomplete('widget');
             if ($menu.is(':visible')) {
                 $input.autocomplete('close');
@@ -258,6 +295,7 @@ $.fn.keyinDropdown = function (settings) {
 
         // X 버튼은 표시값·전송 코드·선택 항목을 모두 비운다.
         $clear.on('click.keyinDropdown', function () {
+            setSingleLocked(false);
             inputRevision++;
             $input.autocomplete('close').val('');
             if ($codeInput) $codeInput.val('');
@@ -270,6 +308,7 @@ $.fn.keyinDropdown = function (settings) {
 
         // 초기화 완료 표시: ADD/COPY 후 같은 초기화 함수를 다시 실행해도 중복 바인딩되지 않는다.
         $input.data('keyinDropdownReady', true);
+        $input.data('keyinDropdownLocked', false);
 
         // 최초 JSP input.value에는 반드시 코드가 들어 있어야 한다.
         // 정적 옵션/서버 렌더링된 명칭이 있으면 즉시 표시한다.
@@ -287,6 +326,22 @@ $.fn.keyinDropdown = function (settings) {
             // 명칭을 알면 즉시 표시하고, 모르면 AJAX에서 코드를 조회해 복원한다.
             if (matching) {
                 setSelected(matching);
+                // 초기 코드/명칭이 있더라도 AJAX에서 후보가 1건임을 확인한 후 잠근다.
+                if (config.autoSelectSingle && config.lockWhenSingle &&
+                    config.ajax && config.ajax.url) {
+                    var confirmRevision = inputRevision;
+                    loadRows('', function (rows, requestContext) {
+                        if (inputRevision !== confirmRevision ||
+                            !matchesContext(requestContext) ||
+                            $codeInput.val() !== initialCode) return;
+
+                        var items = toItems(rows);
+                        if (items.length === 1 && items[0].code === initialCode) {
+                            setSelected(items[0]);
+                            setSingleLocked(true);
+                        }
+                    });
+                }
             } else if (config.ajax && config.ajax.url) {
                 // 기존 코드만 있는 JSP 행은 비동기로 업체명을 조회하여 표시한다.
                 // 조회 중 사용자가 수정/선택/삭제했다면 과거 응답으로 덮어쓰지 않는다.
@@ -298,10 +353,17 @@ $.fn.keyinDropdown = function (settings) {
                         $codeInput.val() !== initialCode ||
                         $input.data('keyinDropdownSelected')) return;
 
-                    var item = $.grep(toItems(rows), function (row) {
+                    var items = toItems(rows);
+                    var item = $.grep(items, function (row) {
                         return row.code === initialCode;
                     })[0];
-                    if (item) setSelected(item);
+                    if (item) {
+                        setSelected(item);
+                        if (config.autoSelectSingle && config.lockWhenSingle &&
+                            items.length === 1 && $.trim(item.code) !== '') {
+                            setSingleLocked(true);
+                        }
+                    }
                 });
             }
         }
