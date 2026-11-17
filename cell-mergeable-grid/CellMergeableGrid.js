@@ -1,5 +1,5 @@
 /**
- * CellMergeableGrid v1.2 — JSON 행 기반 복합키 셀 병합 그리드
+ * CellMergeableGrid v1.3 — JSON 행 기반 복합키 셀 병합 그리드
  * =====================================================================
  * [구성 원리]
  * 2개 키: keyFields=['key1','key2']
@@ -10,8 +10,9 @@
  * 앞의 1~2개 필드는 같은 Radio name을 공유하는 그룹을 구성한다.
  *
  * [화면 처리]
- * merge:true는 그룹 키 컬럼에만 적용된다. 3키의 itemCd/matCd
- * 둘 다 병합할 수 있지만 Radio·업체코드·수량은 행마다 따로 표시된다.
+ * merge:true는 그룹 키와 일반 읽기 전용 컬럼에 적용할 수 있다.
+ * 같은 Radio 그룹 안에서 화면상 연속되고 원본 값과 자료형이 같은 셀을 병합한다.
+ * Radio·마지막 행 식별키·편집 컬럼은 행마다 따로 표시된다.
  * 3키는 그룹 오름차순(품목 ASC → 자재코드 ASC)이 기본이며
  * 2키는 최초 등장 순서를 유지한다. groupOrder로 변경할 수 있다.
  * 화면 출력 인덱스만 재배치하므로 입력된 JSON 배열의 순서는 보존된다.
@@ -103,6 +104,12 @@
         return a === b;
     }
 
+    /** 같은 Radio 그룹 안에서 해당 컬럼의 원본 값이 같은 셀만 병합한다. */
+    function sameMergeCell(left, right, fields, column) {
+        return sameGroup(left, right, fields) &&
+            same(left[column.field], right[column.field]);
+    }
+
     // 숫자로만 구성된 코드는 숫자 비교. 실제 키의 자료형과 값은 변하지 않는다.
     /**
      * 그룹 표시 순서의 오름차순 비교.
@@ -161,25 +168,26 @@
      * @param {function} [options.onSelect] - Radio 변경 시 (row, ctx)
      * @param {function} [options.onCellChange] - 셀 편집 시 (value, row, ctx)
      *
-     * columns의 merge:true는 앞쪽 그룹 키에만 설정할 수 있다.
+     * columns의 merge:true는 그룹 키와 일반 읽기 전용 컬럼에 설정할 수 있다.
      * 마지막 키는 행 식별용이므로 병합하거나 편집할 수 없다.
+     * 병합된 일반 필드 값은 updateRow() 또는 setRows()로 갱신한다.
      */
     function CellMergeableGrid(target, options) {
         options = options || {};
         if (!Array.isArray(options.columns) || options.columns.length === 0) {
-            throw new Error("columns must be a nonempty array");
+            throw new Error("columns는 하나 이상의 컬럼을 포함한 배열이어야 합니다.");
         }
 
         this.keyFields = options.keyFields || ["key1", "key2"];
         if (!Array.isArray(this.keyFields) ||
             (this.keyFields.length !== 2 && this.keyFields.length !== 3)) {
-            throw new Error("keyFields must have 2 or 3 distinct field names");
+            throw new Error("keyFields에는 서로 다른 필드명 2개 또는 3개를 지정해야 합니다.");
         }
         var knownKeys = Object.create(null);
         for (var k = 0; k < this.keyFields.length; k++) {
             var keyField = this.keyFields[k];
             if (typeof keyField !== "string" || !keyField || knownKeys[keyField]) {
-                throw new Error("keyFields must have 2 or 3 distinct field names");
+                throw new Error("keyFields에는 서로 다른 필드명 2개 또는 3개를 지정해야 합니다.");
             }
             knownKeys[keyField] = true;
         }
@@ -189,7 +197,7 @@
         this.groupOrder = options.groupOrder ||
             (this.keyFields.length === 3 ? "asc" : "input");
         if (this.groupOrder !== "asc" && this.groupOrder !== "input") {
-            throw new Error('groupOrder must be "asc" or "input"');
+            throw new Error('groupOrder는 "asc" 또는 "input"이어야 합니다.');
         }
         this.columns = options.columns.slice();
         this._selected = Object.create(null);
@@ -205,23 +213,34 @@
                 radioColumns++;
             }
             if (col.merge) {
-                if (this.keyFields.slice(0, -1).indexOf(col.field) === -1 ||
-                    mergedFields[col.field]) {
-                    throw new Error("merge is allowed once per radio-group key field");
+                if (col.type === "radio") {
+                    throw new Error("라디오 선택 컬럼은 병합할 수 없습니다.");
+                }
+                if (typeof col.field !== "string" || !col.field) {
+                    throw new Error("병합할 컬럼에는 비어 있지 않은 문자열 field를 지정해야 합니다.");
+                }
+                if (col.field === this.keyFields[this.keyFields.length - 1]) {
+                    throw new Error("마지막 키 필드는 행 식별용이므로 병합할 수 없습니다: " + col.field);
+                }
+                if (mergedFields[col.field]) {
+                    throw new Error("같은 필드의 병합 설정은 한 번만 지정할 수 있습니다: " + col.field);
+                }
+                if (col.editor || col.editable) {
+                    throw new Error("병합 컬럼에는 편집기를 사용할 수 없습니다. updateRow() 또는 setRows()로 값을 변경하세요.");
                 }
                 mergedFields[col.field] = true;
             }
             if ((col.editor || col.editable) && this.keyFields.indexOf(col.field) !== -1) {
-                throw new Error("key fields cannot be edited");
+                throw new Error("키 필드는 편집할 수 없습니다: " + col.field);
             }
         }
         if (radioColumns !== 1) {
-            throw new Error("define exactly one radio column");
+            throw new Error("라디오 선택 컬럼은 정확히 하나만 지정해야 합니다.");
         }
 
         var element = typeof target === "string" ? document.querySelector(target) : target;
         if (!element || !element.nodeType) {
-            throw new Error("target element not found");
+            throw new Error("그리드를 표시할 대상 요소를 찾을 수 없습니다.");
         }
         this.host = element;
         if (element.tagName.toLowerCase() === "table") {
@@ -238,7 +257,7 @@
     /** destroy() 이후의 인스턴스 API 사용을 막는다. */
     CellMergeableGrid.prototype._assertAlive = function () {
         if (this._destroyed) {
-            throw new Error("grid has been destroyed");
+            throw new Error("이미 제거된 그리드입니다. 새 인스턴스를 생성하세요.");
         }
     };
 
@@ -250,22 +269,23 @@
      */
     CellMergeableGrid.prototype._validateRows = function (rows) {
         if (!Array.isArray(rows)) {
-            throw new Error("rows must be a JSON array");
+            throw new Error("rows는 JSON 배열이어야 합니다.");
         }
         var seen = Object.create(null);
         for (var i = 0; i < rows.length; i++) {
             var row = rows[i];
             if (!row || typeof row !== "object" || Array.isArray(row)) {
-                throw new Error("each row must be a JSON object");
+                throw new Error((i + 1) + "번째 행은 JSON 객체여야 합니다.");
             }
             for (var k = 0; k < this.keyFields.length; k++) {
                 if (!isScalar(row[this.keyFields[k]])) {
-                    throw new Error("all key fields must have scalar, non-null values");
+                    throw new Error((i + 1) + "번째 행의 키 필드 '" + this.keyFields[k] +
+                        "'에는 문자열, 유한한 숫자 또는 불리언 값을 지정해야 합니다. null이나 누락된 값은 허용되지 않습니다.");
                 }
             }
             var identity = idForRow(row, this.keyFields);
             if (seen[identity]) {
-                throw new Error("duplicate composite key at row " + i);
+                throw new Error((i + 1) + "번째 행의 복합키가 중복되었습니다.");
             }
             seen[identity] = true;
         }
@@ -354,7 +374,7 @@
     CellMergeableGrid.prototype.setSelectedKeys = function (keys) {
         this._assertAlive();
         if (!Array.isArray(keys)) {
-            throw new Error("keys must be an array");
+            throw new Error("선택할 복합키 목록(keys)은 배열이어야 합니다.");
         }
         var present = Object.create(null);
         for (var i = 0; i < this._rows.length; i++) {
@@ -364,11 +384,12 @@
         for (var j = 0; j < keys.length; j++) {
             var key = keys[j];
             if (!key || typeof key !== "object" || Array.isArray(key)) {
-                throw new Error("invalid composite key");
+                throw new Error((j + 1) + "번째 선택 복합키는 JSON 객체여야 합니다.");
             }
             for (var k = 0; k < this.keyFields.length; k++) {
                 if (!isScalar(key[this.keyFields[k]])) {
-                    throw new Error("invalid composite key");
+                    throw new Error((j + 1) + "번째 선택 복합키의 '" + this.keyFields[k] +
+                        "' 값이 올바르지 않습니다. 문자열, 유한한 숫자 또는 불리언 값을 지정하세요.");
                 }
             }
             var id = idForRow(key, this.keyFields);
@@ -398,11 +419,11 @@
     CellMergeableGrid.prototype.updateRow = function (key, patch) {
         this._assertAlive();
         if (!key || !patch || typeof patch !== "object" || Array.isArray(patch)) {
-            throw new Error("updateRow expects a composite key and a patch object");
+            throw new Error("updateRow()에는 복합키와 변경할 필드가 담긴 객체를 전달해야 합니다.");
         }
         for (var k = 0; k < this.keyFields.length; k++) {
             if (Object.prototype.hasOwnProperty.call(patch, this.keyFields[k])) {
-                throw new Error("key fields cannot be changed by updateRow");
+                throw new Error("updateRow()로 키 필드를 변경할 수 없습니다: " + this.keyFields[k]);
             }
         }
         var id = idForRow(key, this.keyFields);
@@ -505,7 +526,7 @@
                 self._changeValue(rowIndex, column, value);
             });
         } else {
-            throw new Error("unsupported editor: " + editor);
+            throw new Error("지원하지 않는 편집기입니다: " + editor);
         }
         return node;
     };
@@ -651,8 +672,8 @@
     /**
      * 기존 테이블의 thead/tbody를 다시 생성한다(colgroup/tfoot 보존).
      * _displayOrder()를 이용해 그룹별 행들을 연속 배치한다.
-     * 그룹 첫 행에서는 merge:true 컬럼의 td를 만들고 rowspan을 지정하며,
-     * 이후 같은 그룹 행에서는 해당 td를 생성하지 않는다.
+     * merge:true 컬럼은 같은 그룹 안에서 값이 연속으로 같은 구간마다
+     * 첫 행에 td와 rowspan을 만들고 이후 행에서는 해당 td를 생성하지 않는다.
      * Radio와 공급업체 필드는 매 행 별도로 생성된다.
      * 외부 CSS를 변경하지 않으므로 border/높이/색상은 페이지에서 설정한다.
      */
@@ -687,14 +708,14 @@
             for (c = 0; c < this.columns.length; c++) {
                 var column = this.columns[c];
                 if (column.merge && position > 0 &&
-                    sameGroup(row, this._rows[displayOrder[position - 1]], this.keyFields)) {
+                    sameMergeCell(row, this._rows[displayOrder[position - 1]], this.keyFields, column)) {
                     continue;
                 }
                 var cell = this._cell(column, i);
                 if (column.merge) {
                     var span = 1;
                     while (position + span < displayOrder.length &&
-                        sameGroup(row, this._rows[displayOrder[position + span]], this.keyFields)) {
+                        sameMergeCell(row, this._rows[displayOrder[position + span]], this.keyFields, column)) {
                         span++;
                     }
                     if (span > 1) {

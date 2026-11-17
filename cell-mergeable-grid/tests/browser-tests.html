@@ -45,6 +45,15 @@
         function signalChange(element) {
             element.dispatchEvent(new Event("change", {bubbles:true}));
         }
+        function mapNodes(nodes, callback) {
+            return Array.prototype.map.call(nodes, callback);
+        }
+        function koreanError(fn, label) {
+            var error;
+            try { fn(); } catch (caught) { error = caught; }
+            check(error instanceof Error, label + " must throw an Error");
+            check(/[가-힣]/.test(error.message), label + " must explain the error in Korean: " + error.message);
+        }
 
         var selectionEvents = [];
         var changes = [];
@@ -234,12 +243,12 @@
         });
         test("3-key radio name includes both group keys, value is VendorWebId", function () {
             var radios=tripleTable.querySelectorAll("input[type=radio]");
-            same(radios.map(function(r){return r.name;}),[
+            same(mapNodes(radios, function(r){return r.name;}),[
                 '["10","100510"]','["10","100510"]',
                 '["10","999999"]','["10","999999"]',
                 '["20","200110"]','["20","200110"]'
             ]);
-            same(radios.map(function(r){return r.value;}),[
+            same(mapNodes(radios, function(r){return r.value;}),[
                 "100002","100006","100008","100009","100002","100010"
             ]);
         });
@@ -333,11 +342,11 @@
             ];
             triple.setRows(unordered);
             var radios = tripleTable.querySelectorAll("input[type=radio]");
-            same(radios.map(function (r) {return r.name;}), [
+            same(mapNodes(radios, function (r) {return r.name;}), [
                 '["10","100"]','["10","100"]','["10","900"]',
                 '["20","200110"]','["30","300001"]','["50","402030"]'
             ]);
-            same(radios.map(function (r) {return r.value;}), ["D","F","C","B","E","A"]);
+            same(mapNodes(radios, function (r) {return r.value;}), ["D","F","C","B","E","A"]);
             check(tripleTable.tBodies[0].rows[0].cells[1].rowSpan === 2);
             check(tripleTable.tBodies[0].rows[0].cells[2].rowSpan === 2);
             same(triple.getRows(), unordered, "original input order must not change");
@@ -358,7 +367,7 @@
                 {itemCd:"10",matCd:"100510",VendorWebId:"B"},
                 {itemCd:"20",matCd:"200110",VendorWebId:"C"}
             ]);
-            same(original.table.querySelectorAll("input[type=radio]").map(function(r) {
+            same(mapNodes(original.table.querySelectorAll("input[type=radio]"), function(r) {
                 return r.name;
             }), ['["50","402030"]','["10","100510"]','["20","200110"]']);
             original.destroy();
@@ -376,8 +385,8 @@
             var data=[{key1:"20",key2:"1"},{key1:"2",key2:"1"}];
             original.setRows(data);
             sorted.setRows(data);
-            same(original.table.querySelectorAll("input[type=radio]").map(function(r){return r.name;}), ["20","2"]);
-            same(sorted.table.querySelectorAll("input[type=radio]").map(function(r){return r.name;}), ["2","20"]);
+            same(mapNodes(original.table.querySelectorAll("input[type=radio]"), function(r){return r.name;}), ["20","2"]);
+            same(mapNodes(sorted.table.querySelectorAll("input[type=radio]"), function(r){return r.name;}), ["2","20"]);
             original.destroy();
             sorted.destroy();
         });
@@ -387,9 +396,188 @@
                 columns:[{type:"radio"},{field:"key1",merge:true},{field:"key2"}]
             });
             simple.setRows([{key1:"A",key2:"01"},{key1:"A",key2:"02"}]);
-            same(simple.table.querySelectorAll("input[type=radio]").map(function(r){return r.name;}),["A","A"]);
+            same(mapNodes(simple.table.querySelectorAll("input[type=radio]"), function(r){return r.name;}),["A","A"]);
             simple.destroy();
             triple.destroy();
+        });
+        test("non-key-only merges group interleaved rows without changing source order or radio selection", function () {
+            var source = [
+                {key1:"B",key2:"01",name:"공통 자재"},
+                {key1:"A",key2:"01",name:"공통 자재"},
+                {key1:"B",key2:"02",name:"공통 자재"},
+                {key1:"A",key2:"02",name:"공통 자재"}
+            ];
+            var merged = new CellMergeableGrid(document.createElement("table"), {
+                columns:[{type:"radio"},{field:"key2"},
+                    {field:"name",merge:true,className:"name-cell"}],
+                rows:source
+            });
+            var names = merged.table.querySelectorAll("td.name-cell");
+            same(mapNodes(names, function(cell) {return cell.rowSpan;}), [2,2],
+                "equal ordinary values must not merge across radio groups");
+            same(mapNodes(merged.table.querySelectorAll("input[type=radio]"), function(r) {
+                return r.name + "/" + r.value;
+            }), ["B/01","B/02","A/01","A/02"]);
+            merged.setSelectedKeys([{key1:"B",key2:"02"},{key1:"A",key2:"01"}]);
+            same(merged.getRows(), source, "merge must not reorder exported rows");
+            same(merged.getSelectedRows(), [source[1],source[2]], "selections retain source order");
+            check(merged.table.querySelectorAll('input[type="radio"]:checked').length === 2);
+            merged.destroy();
+        });
+        test("3-key non-key columns merge independently and retain unequal or nonadjacent values", function () {
+            var merged = new CellMergeableGrid(document.createElement("table"), {
+                keyFields:["itemCd","matCd","VendorWebId"],
+                columns:[{type:"radio"},{field:"itemCd",merge:true},{field:"matCd",merge:true},
+                    {field:"name",merge:true,className:"name-cell"},
+                    {field:"status",merge:true,className:"status-cell"}],
+                rows:[
+                    {itemCd:"10",matCd:"100",VendorWebId:"1",name:"A",status:"대기"},
+                    {itemCd:"10",matCd:"100",VendorWebId:"2",name:"A",status:"완료"},
+                    {itemCd:"10",matCd:"100",VendorWebId:"3",name:"B",status:"완료"},
+                    {itemCd:"10",matCd:"100",VendorWebId:"4",name:"A",status:"완료"},
+                    {itemCd:"10",matCd:"200",VendorWebId:"1",name:"A",status:"완료"}
+                ]
+            });
+            same(mapNodes(merged.table.querySelectorAll("td.name-cell"), function(cell) {
+                return [cell.textContent,cell.rowSpan];
+            }), [["A",2],["B",1],["A",1],["A",1]],
+                "different values, intervening values and material groups must remain distinct");
+            same(mapNodes(merged.table.querySelectorAll("td.status-cell"), function(cell) {
+                return [cell.textContent,cell.rowSpan];
+            }), [["대기",1],["완료",3],["완료",1]], "each column needs independent spans");
+            check(merged.table.tBodies[0].rows[0].cells[1].rowSpan === 4,
+                "group-key merge must still span the whole group");
+            check(merged.table.querySelectorAll("input[type=radio]").length === 5);
+            merged.destroy();
+        });
+        test("non-key merge compares original typed values including zero, false and empty values", function () {
+            var values = [0,0,"0","0",false,false,"","",null,null,undefined,undefined,{x:1},{x:1}];
+            var source = values.map(function(value, index) {
+                var row = {key1:"A",key2:String(index)};
+                if (value !== undefined) { row.value = value; }
+                return row;
+            });
+            var merged = new CellMergeableGrid(document.createElement("table"), {
+                columns:[{type:"radio"},{field:"value",merge:true,className:"value-cell",
+                    renderer:function() {return "same display";}}],
+                rows:source
+            });
+            same(mapNodes(merged.table.querySelectorAll("td.value-cell"), function(cell) {
+                return cell.rowSpan;
+            }), [2,2,2,2,2,2,1,1],
+                "formatted text cannot replace strict raw-value equality");
+            same(merged.getRows(), source);
+            merged.destroy();
+        });
+        test("updateRow splits and rejoins non-key spans while preserving selection and source rows", function () {
+            var source = [
+                {key1:"A",key2:"1",name:"자재"},
+                {key1:"A",key2:"2",name:"자재"},
+                {key1:"A",key2:"3",name:"자재"}
+            ];
+            var merged = new CellMergeableGrid(document.createElement("table"), {
+                columns:[{type:"radio"},{field:"name",merge:true,className:"name-cell"}],
+                rows:source
+            });
+            merged.setSelectedKeys([{key1:"A",key2:"2"}]);
+            check(merged.table.querySelector("td.name-cell").rowSpan === 3);
+            check(merged.updateRow({key1:"A",key2:"2"},{name:"다른 자재"}));
+            same(mapNodes(merged.table.querySelectorAll("td.name-cell"), function(cell) {
+                return [cell.textContent,cell.rowSpan];
+            }), [["자재",1],["다른 자재",1],["자재",1]], "changed middle row must become visible");
+            same(merged.getSelectedRows(), [{key1:"A",key2:"2",name:"다른 자재"}]);
+            check(source[1].name === "자재", "input must remain independent");
+            check(merged.updateRow({key1:"A",key2:"2"},{name:"자재"}));
+            merged.render();
+            merged.setRows(merged.getRows());
+            check(merged.table.querySelectorAll("td.name-cell").length === 1);
+            check(merged.table.querySelector("td.name-cell").rowSpan === 3);
+            same(merged.getRows(), source);
+            same(merged.getSelectedKeys(), [{key1:"A",key2:"2"}]);
+            check(merged.table.querySelectorAll('input[type="radio"]:checked').length === 1);
+            merged.destroy();
+        });
+        test("merged renderer and click callbacks refer to the first displayed cell's original source row", function () {
+            var rendered = [];
+            var clicked;
+            var merged = new CellMergeableGrid(document.createElement("table"), {
+                keyFields:["itemCd","matCd","VendorWebId"],
+                columns:[{type:"radio"},{field:"name",merge:true,className:"name-cell",
+                    renderer:function(value, row, ctx) {
+                        rendered.push({value:value,index:ctx.rowIndex,key:ctx.key});
+                        row.name = "external mutation";
+                        return value;
+                    },
+                    onClick:function(row, ctx) {
+                        clicked = {name:row.name,index:ctx.rowIndex,key:ctx.key,field:ctx.field};
+                        row.name = "external mutation";
+                    }}],
+                rows:[
+                    {itemCd:"20",matCd:"200",VendorWebId:"1",name:"자재B"},
+                    {itemCd:"10",matCd:"100",VendorWebId:"1",name:"자재A"},
+                    {itemCd:"10",matCd:"100",VendorWebId:"2",name:"자재A"}
+                ]
+            });
+            same(rendered.map(function(value) {return value.index;}), [1,0]);
+            merged.table.querySelector("td.name-cell").dispatchEvent(new Event("click", {bubbles:true}));
+            same(clicked, {name:"자재A",index:1,
+                key:{itemCd:"10",matCd:"100",VendorWebId:"1"},field:"name"});
+            check(merged.getRows()[1].name === "자재A", "callback copies must protect internal rows");
+            merged.destroy();
+        });
+        test("invalid configuration and unsupported merge combinations report Korean errors", function () {
+            function create(options) {
+                return new CellMergeableGrid(document.createElement("table"), options);
+            }
+            var invalidOptions = [
+                {}, {columns:[]},
+                {columns:[{type:"radio"}],keyFields:["one"]},
+                {columns:[{type:"radio"}],keyFields:["same","same"]},
+                {columns:[{type:"radio"}],keyFields:["key1",null]},
+                {columns:[{type:"radio"}],groupOrder:"desc"},
+                {columns:[{field:"name"}]},
+                {columns:[{type:"radio"},{type:"radio"}]},
+                {columns:[{type:"radio",field:"key1",merge:true}]},
+                {columns:[{type:"radio"},{field:"key2",merge:true}]},
+                {columns:[{type:"radio"},{merge:true}]},
+                {columns:[{type:"radio"},{field:"",merge:true}]},
+                {columns:[{type:"radio"},{field:1,merge:true}]},
+                {columns:[{type:"radio"},{field:"name",merge:true},{field:"name",merge:true}]},
+                {columns:[{type:"radio"},{field:"key1",editor:"text"}]},
+                {columns:[{type:"radio"},{field:"name",merge:true,editor:"text"}]},
+                {columns:[{type:"radio"},{field:"name",merge:true,editable:true}]},
+                {columns:[{type:"radio"},{field:"name",editor:"unsupported"}],
+                    rows:[{key1:"A",key2:"1",name:"자재"}]}
+            ];
+            invalidOptions.forEach(function(options, index) {
+                koreanError(function() {create(options);}, "configuration " + index);
+            });
+            koreanError(function() {
+                new CellMergeableGrid("#__missing_cell_merge_target__", {columns:[{type:"radio"}]});
+            }, "missing target");
+        });
+        test("row, selection, update and destroyed-grid errors are localized without mutating valid data", function () {
+            var source = [{key1:"A",key2:"1",name:"자재"}];
+            var merged = new CellMergeableGrid(document.createElement("table"), {
+                columns:[{type:"radio"},{field:"name",merge:true}],rows:source
+            });
+            var invalidRows = [{},[null],[[]],[{key1:null,key2:"1"}],
+                [{key1:"A",key2:{}}],[source[0],source[0]]];
+            invalidRows.forEach(function(rows, index) {
+                koreanError(function() {merged.setRows(rows);}, "rows " + index);
+                same(merged.getRows(), source, "invalid rows must not replace current data");
+            });
+            merged.setSelectedKeys([{key1:"A",key2:"1"}]);
+            [{},[null],[[]],[{key1:"A"}]].forEach(function(keys, index) {
+                koreanError(function() {merged.setSelectedKeys(keys);}, "selection " + index);
+                same(merged.getSelectedRows(), source, "invalid keys must preserve selection");
+            });
+            koreanError(function() {merged.updateRow(null,{});}, "missing update key");
+            koreanError(function() {merged.updateRow(source[0],[]);}, "invalid patch");
+            koreanError(function() {merged.updateRow(source[0],{key1:"B"});}, "immutable key");
+            same(merged.getRows(), source);
+            merged.destroy();
+            koreanError(function() {merged.getRows();}, "destroyed instance");
         });
         test("clearSelection and destroy release markup", function () {
             grid.clearSelection();
