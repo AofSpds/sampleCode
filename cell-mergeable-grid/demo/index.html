@@ -6,8 +6,8 @@
     <link rel="stylesheet" href="demo.css">
 </head>
 <body>
-    <h1>CellMergeableGrid — 3개 키 / 2개 컬럼 병합</h1>
-    <div class="note">품목 ASC → 자재코드 ASC · 그룹별 공급업체 단일 선택 · JSON 원본 순서 유지. 데모 CSS만 사용합니다.</div>
+    <h1>CellMergeableGrid — 그룹 키 + 일반 컬럼 병합</h1>
+    <div class="note">품목 ASC → 자재코드 ASC · 그룹별 공급업체 단일 선택 · JSON 원본 순서 유지. 자재명은 키가 아니어도 같은 그룹 안에서 연속된 값이 같으면 병합됩니다.</div>
 
     <div class="controls">
         <button id="show-selected">선택 행 JSON 추출</button>
@@ -18,12 +18,13 @@
     </div>
     <table id="grid" class="demo-grid-table">
         <colgroup>
+            <col style="width: 7%">
             <col style="width: 8%">
-            <col style="width: 10%">
-            <col style="width: 18%">
-            <col style="width: 14%">
-            <col style="width: 32%">
-            <col style="width: 18%">
+            <col style="width: 13%">
+            <col style="width: 16%">
+            <col style="width: 13%">
+            <col style="width: 28%">
+            <col style="width: 15%">
         </colgroup>
     </table>
 
@@ -41,10 +42,10 @@
     (function () {
         "use strict";
         var itemMatCodes = [
-            { itemCd:"10", matCd:"100510" },
-            { itemCd:"20", matCd:"200110" },
-            { itemCd:"30", matCd:"300001" },
-            { itemCd:"50", matCd:"402030" }
+            { itemCd:"10", matCd:"100510", matName:"자재 A" },
+            { itemCd:"20", matCd:"200110", matName:"자재 B" },
+            { itemCd:"30", matCd:"300001", matName:"자재 C" },
+            { itemCd:"50", matCd:"402030", matName:"자재 D" }
         ];
         var vendors = [
             ["100002","(주)엘지상사","1168118686"],
@@ -92,6 +93,7 @@
                     rows.push({
                         itemCd:pair.itemCd,
                         matCd:pair.matCd,
+                        matName:pair.matName,
                         VendorWebId:v[0],
                         vendorName:v[1],
                         bizRegNo:v[2],
@@ -116,6 +118,7 @@
                 {type:"radio",title:"선택"},
                 {field:"itemCd",title:"품목",merge:true,className:"group-cell"},
                 {field:"matCd",title:"자재코드",merge:true,className:"group-cell"},
+                {field:"matName",title:"자재명",merge:true,className:"group-cell"},
                 {field:"VendorWebId",title:"업체코드"},
                 {field:"vendorName",title:"업체명"},
                 {field:"qty",title:"수량",editor:"number",onChange:function(value,row) {
@@ -172,7 +175,8 @@
                 applyRows(JSON.parse(source.value));
                 report("JSON 적용 완료",grid.getSelectedRows());
             } catch(e) {
-                message.textContent="입력 오류: "+e.message;
+                message.textContent="입력 오류: "+(e instanceof SyntaxError ?
+                    "JSON 형식이 올바르지 않습니다. 큰따옴표, 쉼표, 괄호를 확인해 주세요." : e.message);
             }
         };
     }());
